@@ -158,3 +158,36 @@ export interface AdminNoticeRequest {
   /** ISO UTC. null이면 계속 */
   endsAt: string | null
 }
+
+// ---------- 신고 (/admin/reports) ----------
+export type ReportStatus = 'RECEIVED' | 'IN_PROGRESS' | 'DONE'
+
+export const REPORT_STATUS_LABEL: Record<ReportStatus, string> = {
+  RECEIVED: '접수',
+  IN_PROGRESS: '처리 중',
+  DONE: '완료',
+}
+
+export interface AdminReport {
+  reportId: number
+  category: { categoryId: number; name: string }
+  /** 탈퇴했으면 null */
+  reporter: UserSummary | null
+  /** 없거나 탈퇴했으면 null */
+  targetUser: UserSummary | null
+  /** 없거나 삭제됐으면 null. official이 false면 사용자 맵 */
+  targetStage: { stageId: number; title: string; official: boolean } | null
+  title: string
+  comment: string | null
+  status: ReportStatus
+  createdAt: string
+  /** DONE이 된 시각 */
+  handledAt: string | null
+}
+
+/** PATCH /admin/reports/{id} */
+export interface ReportStatusResponse {
+  reportId: number
+  status: ReportStatus
+  handledAt: string | null
+}

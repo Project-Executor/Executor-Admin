@@ -7,9 +7,12 @@ import type {
   AdminMailResponse,
   AdminNotice,
   AdminNoticeRequest,
+  AdminReport,
   AdminUser,
   AdminUserDetail,
   PageResponse,
+  ReportStatus,
+  ReportStatusResponse,
   Role,
 } from './types'
 
@@ -74,4 +77,17 @@ export const updateNotice = (noticeId: number, request: AdminNoticeRequest) =>
   put<AdminNotice>(`/admin/notices/${noticeId}`, request)
 
 export const deleteNotice = (noticeId: number) => api<void>('DELETE', `/admin/notices/${noticeId}`)
+
+// ---------- 신고 ----------
+
+/** 신고 목록 (최신순). status를 비우면 전체 */
+export function fetchReports(status: ReportStatus | '' = '', page = 0, size = 20) {
+  const q = new URLSearchParams({ page: String(page), size: String(size) })
+  if (status) q.set('status', status)
+  return get<PageResponse<AdminReport>>(`/admin/reports?${q}`)
+}
+
+/** 신고 상태 변경. 앞으로만 진행 (접수 -> 처리 중 -> 완료, 접수 -> 완료). 되돌리면 400 */
+export const changeReportStatus = (reportId: number, status: ReportStatus) =>
+  patch<ReportStatusResponse>(`/admin/reports/${reportId}`, { status })
 

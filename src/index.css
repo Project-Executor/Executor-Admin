@@ -558,3 +558,51 @@ a.button {
   text-decoration: none;
   filter: brightness(1.05);
 }
+
+/* 탭 */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tabs .tab {
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 8px 14px;
+}
+
+.tabs .tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* 신고 */
+.badge.received {
+  background: #fdecec;
+  color: var(--danger);
+}
+
+.table tr.clickable {
+  cursor: pointer;
+}
+
+.table tr.detail-row,
+.table tr.detail-row:hover {
+  background: #fafbfc;
+}
+
+.report-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 6px 4px 8px;
+  white-space: normal;
+}
+
+.info dd.pre {
+  white-space: pre-wrap;
+}
