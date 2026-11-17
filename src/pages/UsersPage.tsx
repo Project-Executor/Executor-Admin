@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { fetchUsers } from '../api/admin'
 import { ApiError } from '../api/client'
 import type { AdminUser, PageResponse, Role } from '../api/types'
@@ -88,7 +88,7 @@ export default function UsersPage() {
   return (
     <section>
       <h2>유저 관리</h2>
-      <p className="muted">닉네임·이메일 일부나 사용자 ID로 찾습니다. 최근 가입순입니다.</p>
+      <p className="muted">닉네임·이메일 일부나 사용자 ID로 찾습니다. 최근 가입순이고, 닉네임을 누르면 상세 화면으로 갑니다.</p>
 
       <form className="card row" onSubmit={search}>
         <input placeholder="닉네임·이메일·ID" value={input} maxLength={100} onChange={(e) => setInput(e.target.value)} />
@@ -160,7 +160,8 @@ export default function UsersPage() {
                 </td>
                 <td className="num">{u.userId}</td>
                 <td>
-                  {u.nickname ?? <span className="muted">(닉네임 없음)</span>} <RoleBadge role={u.role} />
+                  <Link to={`/users/${u.userId}`}>{u.nickname ?? <span className="muted">(닉네임 없음)</span>}</Link>{' '}
+                  <RoleBadge role={u.role} />
                 </td>
                 <td>{u.email}</td>
                 <td className="num">{u.coin.toLocaleString()}</td>

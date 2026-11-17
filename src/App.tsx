@@ -4,6 +4,7 @@ import Layout from './components/Layout.tsx'
 import HomePage from './pages/HomePage.tsx'
 import LoginPage from './pages/LoginPage.tsx'
 import MailPage from './pages/MailPage.tsx'
+import UserDetailPage from './pages/UserDetailPage.tsx'
 import UsersPage from './pages/UsersPage.tsx'
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
         <Route index element={<HomePage />} />
         <Route path="mails" element={<MailPage />} />
         <Route path="users" element={<UsersPage />} />
+        <Route path="users/:userId" element={<UserDetailPage />} />
         {/* 기능 화면은 기능별 작업에서 추가: notices, reports, stages, items, guidebooks */}
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

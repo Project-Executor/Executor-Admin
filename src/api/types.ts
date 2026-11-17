@@ -81,3 +81,32 @@ export interface AdminUser {
   coin: number
   createdAt: string
 }
+
+/** GET /admin/users/{id} */
+export interface AdminUserDetail extends AdminUser {
+  comment: string | null
+  /** null이면 기본 스킨 */
+  equippedSkinId: number | null
+  /** null이면 기본 테마 */
+  equippedThemeId: number | null
+  /** 공식 스테이지 */
+  clearedStageCount: number
+  totalStars: number
+  /** 수량 0인 힌트는 빠짐 */
+  items: OwnedItem[]
+}
+
+export interface OwnedItem {
+  itemId: number
+  name: string
+  itemType: ItemType
+  quantity: number
+  acquiredAt: string
+}
+
+/** PATCH /admin/users/{id}/coin */
+export interface AdminCoinResponse {
+  userId: number
+  /** 조정한 뒤의 코인 */
+  coin: number
+}

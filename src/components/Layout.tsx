@@ -25,7 +25,7 @@ export default function Layout() {
         <nav>
           {MENU.map((m) =>
             m.path ? (
-              <NavLink key={m.label} to={m.path} end className={({ isActive }) => (isActive ? 'active' : '')}>
+              <NavLink key={m.label} to={m.path} end={m.path === '/'} className={({ isActive }) => (isActive ? 'active' : '')}>
                 {m.label}
               </NavLink>
             ) : (

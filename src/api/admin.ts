@@ -1,6 +1,15 @@
 // 관리자 화면에서 쓰는 API. 기능을 추가할 때 여기에 함수를 더한다.
-import { get, post } from './client'
-import type { AdminItem, AdminMailRequest, AdminMailResponse, AdminUser, PageResponse, Role } from './types'
+import { get, patch, post } from './client'
+import type {
+  AdminCoinResponse,
+  AdminItem,
+  AdminMailRequest,
+  AdminMailResponse,
+  AdminUser,
+  AdminUserDetail,
+  PageResponse,
+  Role,
+} from './types'
 
 /** 아이템 전체 (판매 중단 포함) */
 export const fetchItems = () => get<AdminItem[]>('/admin/items')
@@ -28,6 +37,16 @@ export const LOOKUP_MAX = 100
 
 /** ID로 여러 명 조회 (ID 순). 없는 ID는 결과에서 빠진다 */
 export const lookupUsers = (ids: number[]) => get<AdminUser[]>(`/admin/users/by-ids?ids=${ids.join(',')}`)
+
+/** 유저 상세 */
+export const fetchUserDetail = (userId: number) => get<AdminUserDetail>(`/admin/users/${userId}`)
+
+/** 코인 조정. amount가 음수면 뺀다 (0 미만이 되면 409 NOT_ENOUGH_COIN) */
+export const adjustCoin = (userId: number, amount: number) =>
+  patch<AdminCoinResponse>(`/admin/users/${userId}/coin`, { amount })
+
+/** 권한 변경. 자기 자신은 바꿀 수 없다(400). 다음 토큰 재발급(최대 30분 뒤)부터 적용 */
+export const changeRole = (userId: number, role: Role) => patch<AdminUser>(`/admin/users/${userId}/role`, { role })
 
 /** 우편 발송. 없는 사용자가 있으면 404로 아무에게도 보내지 않는다 */
 export const sendMail = (request: AdminMailRequest) => post<AdminMailResponse>('/admin/mails', request)

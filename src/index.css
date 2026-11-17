@@ -433,3 +433,76 @@ button.small-btn {
   align-items: center;
   gap: 14px;
 }
+
+/* 상세 */
+.content a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.content a:hover {
+  text-decoration: underline;
+}
+
+.title-row {
+  justify-content: space-between;
+}
+
+.title-row h2 {
+  margin: 0;
+}
+
+.card-title {
+  font-size: 15px;
+  margin: 0;
+}
+
+.table-wrap .card-title {
+  padding: 14px 16px 10px;
+}
+
+.info {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.info dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.info dd {
+  margin: 0;
+  word-break: break-all;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.form.compact {
+  gap: 12px;
+}
+
+.form.compact p {
+  margin: 0;
+}
+
+button.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+@media (max-width: 760px) {
+  .grid2 {
+    grid-template-columns: 1fr;
+  }
+  .info {
+    grid-template-columns: 90px 1fr;
+  }
+}
