@@ -1,6 +1,21 @@
 import { useEffect, useState } from 'react'
-import { fillBorder, nextId, OBJECT_INFO, OBJECT_TYPES, objectAt, resize, validate, MAX_SIZE, MIN_SIZE } from './mapData'
+import {
+  fillBorder,
+  maxUnstable,
+  nextCheckpointOrder,
+  nextId,
+  OBJECT_INFO,
+  OBJECT_TYPES,
+  objectAt,
+  resize,
+  setMaxUnstable,
+  validate,
+  MAX_SIZE,
+  MIN_SIZE,
+} from './mapData'
 import type { GridMap, MapObject, MapObjectType } from './mapData'
+import { solveMap, TURN_SLACK } from './mapSolver'
+import type { SegmentResult } from './mapSolver'
 
 /** 팔레트 도구 */
 type Tool = 'wall' | 'floor' | 'player' | 'erase' | 'select' | MapObjectType
@@ -18,7 +33,18 @@ const TERRAIN_TOOLS: { tool: Tool; label: string; symbol: string }[] = [
  * - 벽·바닥: 끌어서 여러 칸. 벽을 칠하면 그 칸의 오브젝트는 지워진다
  * - 오브젝트: 바닥에만, 한 칸에 하나. 놓으면 바로 선택되어 속성을 고칠 수 있다
  */
-export default function MapEditor({ map, onChange }: { map: GridMap; onChange: (next: GridMap) => void }) {
+export default function MapEditor({
+  map,
+  onChange,
+  parMoves,
+  onParMoves,
+}: {
+  map: GridMap
+  onChange: (next: GridMap) => void
+  /** 스테이지 기준 턴 (시작 구간의 턴). 최소 턴 계산의 비교와 추천 적용에 쓴다 */
+  parMoves?: number | null
+  onParMoves?: (value: number) => void
+}) {
   const [tool, setTool] = useState<Tool>('wall')
   const [painting, setPainting] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -32,6 +58,31 @@ export default function MapEditor({ map, onChange }: { map: GridMap; onChange: (
     window.addEventListener('mouseup', stop)
     return () => window.removeEventListener('mouseup', stop)
   }, [])
+
+  // 최소 턴 계산 결과와 그때의 맵 (맵이 바뀌면 다시 계산하라고 알린다)
+  const [solved, setSolved] = useState<{ map: GridMap; results: SegmentResult[] } | null>(null)
+
+  function solve() {
+    setSolved({ map, results: solveMap(map, parMoves ?? null) })
+  }
+
+  /** 추천값 적용: 시작 구간은 스테이지 기준 턴, 나머지는 그 구간을 시작하는 체크포인트의 turns */
+  function applyRecommended(results: SegmentResult[]) {
+    let next = map
+    for (const r of results) {
+      if (r.recommended == null) continue
+      if (r.from === 0) {
+        onParMoves?.(r.recommended)
+        continue
+      }
+      next = {
+        ...next,
+        objects: next.objects.map((o) => (o.type === 'checkpoint' && o.order === r.from ? { ...o, turns: r.recommended } : o)),
+      }
+    }
+    onChange(next)
+    setSolved({ map: next, results: solveMap(next, results[0]?.recommended ?? parMoves ?? null) })
+  }
 
   const selected = selectedId ? map.objects.find((o) => o.id === selectedId) ?? null : null
   const issues = validate(map)
@@ -64,6 +115,8 @@ export default function MapEditor({ map, onChange }: { map: GridMap; onChange: (
         if (x === map.player.x && y === map.player.y) return
         const id = nextId(map, tool)
         const obj: MapObject = { id, type: tool, x, y, ...OBJECT_INFO[tool].defaults }
+        // 체크포인트는 놓을 때마다 다음 구간 번호를 붙인다
+        if (tool === 'checkpoint') obj.order = at?.type === 'checkpoint' ? at.order : nextCheckpointOrder(map)
         // 출구는 하나뿐이라 새로 놓으면 옮긴다
         const others = map.objects.filter((o) => o !== at && !(tool === 'exit' && o.type === 'exit'))
         onChange({ ...map, tiles: floorAt(map, x, y), objects: [...others, obj] })
@@ -139,7 +192,7 @@ export default function MapEditor({ map, onChange }: { map: GridMap; onChange: (
                       if (painting) apply(x, y, true)
                     }}
                   >
-                    {isPlayer ? 'P' : o ? (OBJECT_INFO[o.type as MapObjectType]?.symbol ?? '?') : ''}
+                    {isPlayer ? 'P' : o ? (o.type === 'checkpoint' ? String(o.order ?? 'S') : (OBJECT_INFO[o.type as MapObjectType]?.symbol ?? '?')) : ''}
                   </button>
                 )
               }),
@@ -167,6 +220,31 @@ export default function MapEditor({ map, onChange }: { map: GridMap; onChange: (
           </div>
 
           <div className="map-box">
+            <b className="small">별 2 조건</b>
+            <label>
+              허용하는 불안정 체크포인트 수 (stars.maxUnstable, 출구 포함)
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={String(maxUnstable(map))}
+                onChange={(e) => {
+                  const n = Number(e.target.value)
+                  if (Number.isInteger(n) && n >= 0) onChange(setMaxUnstable(map, n))
+                }}
+              />
+            </label>
+            <p className="muted small">
+              체크포인트 {map.objects.filter((o) => o.type === 'checkpoint').length}개 · 구간 {map.objects.filter((o) => o.type === 'checkpoint').length + 1}개. 첫 구간의 턴은 스테이지
+              기준 턴입니다.
+            </p>
+            <p className="muted small">
+              ★3: 숨겨진 요소 {map.objects.filter((o) => o.type === 'hidden').length}개를 모두 모으기
+              {map.objects.some((o) => o.type === 'hidden') ? '' : ' (없으면 ★3을 얻을 수 없음)'}
+            </p>
+          </div>
+
+          <div className="map-box">
             <b className="small">선택한 오브젝트</b>
             {selected ? (
               <ObjectFields key={selected.id} obj={selected} onChange={updateSelected} onDelete={() => {
@@ -175,6 +253,45 @@ export default function MapEditor({ map, onChange }: { map: GridMap; onChange: (
               }} />
             ) : (
               <p className="muted small">‘선택’ 도구로 오브젝트를 누르면 속성을 고칠 수 있습니다. 새로 놓은 오브젝트는 바로 선택됩니다.</p>
+            )}
+          </div>
+
+          <div className="map-box">
+            <b className="small">최소 턴 계산</b>
+            <p className="muted small">
+              구간마다 가장 짧은 풀이를 찾습니다. 추천 턴 = 최소 × {TURN_SLACK} (올림). 숨겨진 요소 수집은 넣지 않습니다.
+            </p>
+            <button type="button" className="secondary small-btn" onClick={solve}>
+              계산
+            </button>
+            {solved && (
+              <>
+                {solved.map !== map && <p className="small warn-text">맵이 바뀌었습니다. 다시 계산하세요.</p>}
+                <ul className="segments">
+                  {solved.results.map((r) => {
+                    const label = `${r.from === 0 ? '시작' : `체크포인트 ${r.from}`} → ${r.to === 'exit' ? '출구' : `체크포인트 ${r.to}`}`
+                    if (r.minTurns == null) {
+                      return (
+                        <li key={label} className="bad">
+                          {label}: {r.error}
+                        </li>
+                      )
+                    }
+                    const tight = r.currentLimit != null && r.currentLimit < r.minTurns
+                    return (
+                      <li key={label} className={tight ? 'bad' : ''} title={`풀이: ${r.moves}`}>
+                        {label}: 최소 <b>{r.minTurns}</b> · 지금 {r.currentLimit ?? '없음'} · 추천 {r.recommended}
+                        {tight && ' (지금 턴으로는 안정 도착 불가)'}
+                      </li>
+                    )
+                  })}
+                </ul>
+                {solved.map === map && solved.results.some((r) => r.recommended != null) && (
+                  <button type="button" className="small-btn" onClick={() => applyRecommended(solved.results)}>
+                    추천값 적용
+                  </button>
+                )}
+              </>
             )}
           </div>
 
@@ -236,14 +353,33 @@ function ObjectFields({ obj, onChange, onDelete }: { obj: MapObject; onChange: (
           </label>
         </>
       )}
-      {obj.type === 'turnReset' && (
+      {obj.type === 'hidden' && (
+        <label>
+          이름 (선택, 화면에 표시)
+          <input value={String(obj.name ?? '')} onChange={(e) => onChange({ name: e.target.value || undefined })} />
+        </label>
+      )}
+      {obj.type === 'anomaly' && (
         <>
           <label>
-            turns (비우면 스테이지 기준 턴)
-            <input type="number" min={1} value={obj.turns === undefined ? '' : String(obj.turns)} onChange={(e) => onChange({ turns: intOrUndefined(e.target.value) })} />
+            이름 (name)
+            <input value={String(obj.name ?? '')} onChange={(e) => onChange({ name: e.target.value })} />
           </label>
-          <label className="inline">
-            <input type="checkbox" checked={obj.once !== false} onChange={(e) => onChange({ once: e.target.checked })} /> 한 번 쓰면 사라짐 (once)
+          <label>
+            도감 ID (guidebookId, 도감 화면의 ID)
+            <input type="number" min={1} value={obj.guidebookId === undefined ? '' : String(obj.guidebookId)} onChange={(e) => onChange({ guidebookId: intOrUndefined(e.target.value) })} />
+          </label>
+        </>
+      )}
+      {obj.type === 'checkpoint' && (
+        <>
+          <label>
+            order (구간 번호, 플레이 순서대로 1부터)
+            <input type="number" min={1} value={obj.order === undefined ? '' : String(obj.order)} onChange={(e) => onChange({ order: intOrUndefined(e.target.value) })} />
+          </label>
+          <label>
+            turns (여기서 시작하는 구간의 턴)
+            <input type="number" min={1} value={obj.turns === undefined ? '' : String(obj.turns)} onChange={(e) => onChange({ turns: intOrUndefined(e.target.value) })} />
           </label>
         </>
       )}
