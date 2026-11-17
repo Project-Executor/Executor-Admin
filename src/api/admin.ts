@@ -3,6 +3,7 @@ import { api, get, patch, post, put } from './client'
 import type {
   AdminCoinResponse,
   AdminItem,
+  AdminItemRequest,
   AdminMailRequest,
   AdminMailResponse,
   AdminNotice,
@@ -18,6 +19,13 @@ import type {
 
 /** 아이템 전체 (판매 중단 포함) */
 export const fetchItems = () => get<AdminItem[]>('/admin/items')
+
+/** 아이템 등록 (항상 판매 중으로) */
+export const createItem = (request: AdminItemRequest) => post<AdminItem>('/admin/items', request)
+
+/** 아이템 수정 (모든 값). 판매 중단은 isActive = false */
+export const updateItem = (itemId: number, request: AdminItemRequest) =>
+  put<AdminItem>(`/admin/items/${itemId}`, request)
 
 export interface UserQuery {
   /** 닉네임·이메일 일부 또는 사용자 ID. 비우면 전체 */

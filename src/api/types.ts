@@ -191,3 +191,25 @@ export interface ReportStatusResponse {
   status: ReportStatus
   handledAt: string | null
 }
+
+export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
+  SKIN: '스킨',
+  THEME: '테마',
+  HINT: '힌트',
+}
+
+/** POST·PUT /admin/items. PUT은 모든 값을 보낸다 */
+export interface AdminItemRequest {
+  /** 1~100자, 다른 아이템과 겹치면 409 */
+  name: string
+  /** 255자 이하, 비우면 null */
+  image: string | null
+  /** 255자 이하, 비우면 null */
+  description: string | null
+  /** 가진 사용자가 있으면 바꿀 수 없다 (400) */
+  itemType: ItemType
+  /** 0 이상 */
+  price: number
+  /** 등록할 때는 무시(항상 판매 중), 수정할 때는 필수 */
+  isActive: boolean
+}

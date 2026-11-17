@@ -11,7 +11,7 @@ export default function HomePage() {
       <div className="card">
         <h3>준비 중인 기능</h3>
         <ul>
-          <li>작전·스테이지·아이템·도감 관리</li>
+          <li>작전·스테이지·도감 관리</li>
         </ul>
       </div>
     </section>

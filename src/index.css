@@ -606,3 +606,9 @@ a.button {
 .info dd.pre {
   white-space: pre-wrap;
 }
+
+.row.nowrap-row {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
