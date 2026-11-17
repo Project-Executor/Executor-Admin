@@ -8,7 +8,12 @@ import type {
   AdminMailResponse,
   AdminNotice,
   AdminNoticeRequest,
+  AdminOperation,
+  AdminOperationRequest,
+  AdminOperationTree,
   AdminReport,
+  AdminStage,
+  AdminStageRequest,
   AdminUser,
   AdminUserDetail,
   PageResponse,
@@ -98,4 +103,28 @@ export function fetchReports(status: ReportStatus | '' = '', page = 0, size = 20
 /** 신고 상태 변경. 앞으로만 진행 (접수 -> 처리 중 -> 완료, 접수 -> 완료). 되돌리면 400 */
 export const changeReportStatus = (reportId: number, status: ReportStatus) =>
   patch<ReportStatusResponse>(`/admin/reports/${reportId}`, { status })
+
+// ---------- 작전·스테이지 ----------
+
+/** 작전 전체 (표시 순서) + 소속 스테이지 요약 */
+export const fetchOperations = () => get<AdminOperationTree[]>('/admin/operations')
+
+export const createOperation = (request: AdminOperationRequest) => post<AdminOperation>('/admin/operations', request)
+
+export const updateOperation = (operationId: number, request: AdminOperationRequest) =>
+  put<AdminOperation>(`/admin/operations/${operationId}`, request)
+
+/** 스테이지가 남아 있으면 409 OPERATION_HAS_STAGES */
+export const deleteOperation = (operationId: number) => api<void>('DELETE', `/admin/operations/${operationId}`)
+
+export const fetchStage = (stageId: number) => get<AdminStage>(`/admin/stages/${stageId}`)
+
+export const createStage = (request: AdminStageRequest) => post<AdminStage>('/admin/stages', request)
+
+/** 사용자 기록은 유지된다 */
+export const updateStage = (stageId: number, request: AdminStageRequest) =>
+  put<AdminStage>(`/admin/stages/${stageId}`, request)
+
+/** 사용자 기록도 함께 삭제되고, 도감의 stageId는 null이 된다 */
+export const deleteStage = (stageId: number) => api<void>('DELETE', `/admin/stages/${stageId}`)
 

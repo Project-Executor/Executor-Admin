@@ -213,3 +213,79 @@ export interface AdminItemRequest {
   /** 등록할 때는 무시(항상 판매 중), 수정할 때는 필수 */
   isActive: boolean
 }
+
+// ---------- 작전·스테이지 (/admin/operations, /admin/stages) ----------
+export type StageType = 'TUTORIAL' | 'NORMAL' | 'BOSS'
+
+export const STAGE_TYPE_LABEL: Record<StageType, string> = {
+  TUTORIAL: '튜토리얼',
+  NORMAL: '일반',
+  BOSS: '보스',
+}
+
+export interface AdminStageSummary {
+  stageId: number
+  stageNo: number
+  stageType: StageType
+  title: string
+  parMoves: number
+  rewardCoin: number
+  updatedAt: string
+}
+
+/** GET /admin/operations 항목 */
+export interface AdminOperationTree {
+  operationId: number
+  name: string
+  description: string | null
+  /** 표시 순서 (튜토리얼 = 0), 작전끼리 겹칠 수 없다 */
+  sortOrder: number
+  /** 번호 순 */
+  stages: AdminStageSummary[]
+}
+
+export interface AdminOperationRequest {
+  /** 1~100자, 겹치면 409 */
+  name: string
+  /** 255자 이하 */
+  description: string | null
+  /** 0 이상, 겹치면 409 */
+  sortOrder: number
+}
+
+export interface AdminOperation {
+  operationId: number
+  name: string
+  description: string | null
+  sortOrder: number
+}
+
+/** GET /admin/stages/{id}. mapData에 hints가 그대로 들어 있다 */
+export interface AdminStage {
+  stageId: number
+  operationId: number
+  stageNo: number
+  stageType: StageType
+  title: string
+  mapData: Record<string, unknown>
+  hintCount: number
+  parMoves: number
+  rewardCoin: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AdminStageRequest {
+  operationId: number
+  /** 1 이상, 작전 안에서 겹치면 409 */
+  stageNo: number
+  stageType: StageType
+  /** 1~100자 */
+  title: string
+  /** JSON 객체 (문자열 아님). hints가 있으면 배열 */
+  mapData: Record<string, unknown>
+  /** 1~9999 */
+  parMoves: number
+  /** 0 이상 */
+  rewardCoin: number
+}

@@ -8,7 +8,7 @@ const MENU: { label: string; path?: string }[] = [
   { label: '공지사항', path: '/notices' },
   { label: '유저 관리', path: '/users' },
   { label: '신고', path: '/reports' },
-  { label: '작전·스테이지' },
+  { label: '작전·스테이지', path: '/stages' },
   { label: '아이템', path: '/items' },
   { label: '도감' },
 ]
