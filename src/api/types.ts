@@ -33,3 +33,40 @@ export interface MyProfile {
   coin: number
   role: Role
 }
+
+// ---------- 아이템 (GET /admin/items) ----------
+export type ItemType = 'SKIN' | 'THEME' | 'HINT'
+
+export interface AdminItem {
+  itemId: number
+  name: string
+  image: string | null
+  description: string | null
+  itemType: ItemType
+  price: number
+  /** false면 판매 중단 (우편 보상으로는 보낼 수 있음) */
+  isActive: boolean
+  createdAt: string
+}
+
+// ---------- 우편 (POST /admin/mails) ----------
+export interface AdminMailRequest {
+  /** toAll이 false일 때 받는 사람 (최대 1000명, 중복은 한 번만) */
+  receiverIds: number[] | null
+  toAll: boolean
+  /** 1~100자 */
+  title: string
+  /** 2000자 이하 */
+  content: string | null
+  /** 0~1,000,000 */
+  rewardCoin: number
+  rewardItemId: number | null
+  /** 아이템이 없으면 0, 스킨·테마는 1, 힌트는 1~99 */
+  rewardItemQuantity: number
+  /** ISO-8601 UTC. null이면 무기한, 값이 있으면 지금보다 뒤 */
+  expiresAt: string | null
+}
+
+export interface AdminMailResponse {
+  sentCount: number
+}

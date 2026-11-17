@@ -228,3 +228,114 @@ button.ghost {
     padding: 20px 16px;
   }
 }
+
+/* 폼 */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+fieldset {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px 16px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+legend {
+  font-weight: 700;
+  padding: 0 6px;
+}
+
+label.inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.row input:not([type='radio']):not([type='checkbox']) {
+  flex: 1;
+  min-width: 180px;
+}
+
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .grid3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.success {
+  color: #1f8a4c;
+  margin: 0;
+  font-weight: 600;
+}
+
+button.secondary {
+  background: #fff;
+  color: var(--accent);
+}
+
+/* 사용자 칩 */
+.results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 999px;
+  background: var(--accent-weak);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.chip small {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.chip button {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  padding: 0 4px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+button.chip.add {
+  background: #fff;
+  border-color: var(--line);
+  color: var(--text);
+  padding: 4px 10px;
+}

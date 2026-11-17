@@ -11,7 +11,6 @@ export default function HomePage() {
       <div className="card">
         <h3>준비 중인 기능</h3>
         <ul>
-          <li>우편 발송 (개별·전체)</li>
           <li>공지사항 (등록·수정·삭제)</li>
           <li>유저 관리 (검색·상세·정지·권한·코인)</li>
           <li>신고 처리</li>
