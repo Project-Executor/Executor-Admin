@@ -1,8 +1,18 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './auth/context'
 import Layout from './components/Layout.tsx'
+import GuidebooksPage from './pages/GuidebooksPage.tsx'
 import HomePage from './pages/HomePage.tsx'
+import ItemsPage from './pages/ItemsPage.tsx'
 import LoginPage from './pages/LoginPage.tsx'
+import MailPage from './pages/MailPage.tsx'
+import NoticeEditPage from './pages/NoticeEditPage.tsx'
+import NoticesPage from './pages/NoticesPage.tsx'
+import OperationsPage from './pages/OperationsPage.tsx'
+import ReportsPage from './pages/ReportsPage.tsx'
+import StageEditPage from './pages/StageEditPage.tsx'
+import UserDetailPage from './pages/UserDetailPage.tsx'
+import UsersPage from './pages/UsersPage.tsx'
 
 export default function App() {
   const { admin } = useAuth()
@@ -23,7 +33,18 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
-        {/* 기능 화면은 기능별 작업에서 추가: mails, notices, users, reports, stages, items, guidebooks */}
+        <Route path="mails" element={<MailPage />} />
+        <Route path="notices" element={<NoticesPage />} />
+        <Route path="notices/new" element={<NoticeEditPage key="new" />} />
+        <Route path="notices/:noticeId" element={<NoticeEditPage />} />
+        <Route path="reports" element={<ReportsPage />} />
+        <Route path="items" element={<ItemsPage />} />
+        <Route path="stages" element={<OperationsPage />} />
+        <Route path="stages/new" element={<StageEditPage key="new" />} />
+        <Route path="stages/:stageId" element={<StageEditPage />} />
+        <Route path="guidebooks" element={<GuidebooksPage />} />
+        <Route path="users" element={<UsersPage />} />
+        <Route path="users/:userId" element={<UserDetailPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -4,13 +4,13 @@ import { useAuth } from '../auth/context'
 /** 메뉴. path가 없으면 아직 만들지 않은 기능 (준비 중으로 표시) */
 const MENU: { label: string; path?: string }[] = [
   { label: '홈', path: '/' },
-  { label: '우편 발송' },
-  { label: '공지사항' },
-  { label: '유저 관리' },
-  { label: '신고' },
-  { label: '작전·스테이지' },
-  { label: '아이템' },
-  { label: '도감' },
+  { label: '우편 발송', path: '/mails' },
+  { label: '공지사항', path: '/notices' },
+  { label: '유저 관리', path: '/users' },
+  { label: '신고', path: '/reports' },
+  { label: '작전·스테이지', path: '/stages' },
+  { label: '아이템', path: '/items' },
+  { label: '도감', path: '/guidebooks' },
 ]
 
 export default function Layout() {
@@ -25,7 +25,7 @@ export default function Layout() {
         <nav>
           {MENU.map((m) =>
             m.path ? (
-              <NavLink key={m.label} to={m.path} end className={({ isActive }) => (isActive ? 'active' : '')}>
+              <NavLink key={m.label} to={m.path} end={m.path === '/'} className={({ isActive }) => (isActive ? 'active' : '')}>
                 {m.label}
               </NavLink>
             ) : (
