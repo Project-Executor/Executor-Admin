@@ -289,3 +289,34 @@ export interface AdminStageRequest {
   /** 0 이상 */
   rewardCoin: number
 }
+
+// ---------- 도감 (/admin/guidebooks) ----------
+export type GuidebookCategory = 'BUG' | 'VIRUS' | 'TERM'
+
+export const GUIDEBOOK_CATEGORY_LABEL: Record<GuidebookCategory, string> = {
+  BUG: '오류',
+  VIRUS: '바이러스',
+  TERM: '개발 용어',
+}
+
+export interface AdminGuidebook {
+  guidebookId: number
+  /** 처음 등장하는 공식 스테이지. 없거나 스테이지가 삭제됐으면 null */
+  stageId: number | null
+  category: GuidebookCategory
+  title: string
+  image: string | null
+  comment: string
+}
+
+/** POST·PUT /admin/guidebooks (모든 값) */
+export interface AdminGuidebookRequest {
+  stageId: number | null
+  category: GuidebookCategory
+  /** 1~255자, 겹치면 409 */
+  title: string
+  /** 255자 이하 */
+  image: string | null
+  /** 1~10000자 */
+  comment: string
+}

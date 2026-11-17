@@ -10,7 +10,7 @@ const MENU: { label: string; path?: string }[] = [
   { label: '신고', path: '/reports' },
   { label: '작전·스테이지', path: '/stages' },
   { label: '아이템', path: '/items' },
-  { label: '도감' },
+  { label: '도감', path: '/guidebooks' },
 ]
 
 export default function Layout() {

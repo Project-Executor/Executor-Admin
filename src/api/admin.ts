@@ -1,6 +1,8 @@
 // 관리자 화면에서 쓰는 API. 기능을 추가할 때 여기에 함수를 더한다.
 import { api, get, patch, post, put } from './client'
 import type {
+  AdminGuidebook,
+  AdminGuidebookRequest,
   AdminCoinResponse,
   AdminItem,
   AdminItemRequest,
@@ -127,4 +129,17 @@ export const updateStage = (stageId: number, request: AdminStageRequest) =>
 
 /** 사용자 기록도 함께 삭제되고, 도감의 stageId는 null이 된다 */
 export const deleteStage = (stageId: number) => api<void>('DELETE', `/admin/stages/${stageId}`)
+
+// ---------- 도감 ----------
+
+/** 도감 전체 (ID 순, 내용 포함) */
+export const fetchGuidebooks = () => get<AdminGuidebook[]>('/admin/guidebooks')
+
+export const createGuidebook = (request: AdminGuidebookRequest) => post<AdminGuidebook>('/admin/guidebooks', request)
+
+export const updateGuidebook = (guidebookId: number, request: AdminGuidebookRequest) =>
+  put<AdminGuidebook>(`/admin/guidebooks/${guidebookId}`, request)
+
+/** 사용자들의 해금 기록도 함께 삭제된다 */
+export const deleteGuidebook = (guidebookId: number) => api<void>('DELETE', `/admin/guidebooks/${guidebookId}`)
 
