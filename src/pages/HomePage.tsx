@@ -12,7 +12,6 @@ export default function HomePage() {
         <h3>준비 중인 기능</h3>
         <ul>
           <li>공지사항 (등록·수정·삭제)</li>
-          <li>유저 정지</li>
           <li>신고 처리</li>
           <li>작전·스테이지·아이템·도감 관리</li>
         </ul>

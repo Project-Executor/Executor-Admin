@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { fetchUsers } from '../api/admin'
 import { ApiError } from '../api/client'
 import type { AdminUser, PageResponse, Role } from '../api/types'
-import RoleBadge from '../components/RoleBadge.tsx'
+import RoleBadge, { SuspendedBadge } from '../components/RoleBadge.tsx'
 import { toReceiver } from './mailState'
 import type { MailPageState } from './mailState'
 
@@ -161,7 +161,7 @@ export default function UsersPage() {
                 <td className="num">{u.userId}</td>
                 <td>
                   <Link to={`/users/${u.userId}`}>{u.nickname ?? <span className="muted">(닉네임 없음)</span>}</Link>{' '}
-                  <RoleBadge role={u.role} />
+                  <RoleBadge role={u.role} /> <SuspendedBadge until={u.suspendedUntil} />
                 </td>
                 <td>{u.email}</td>
                 <td className="num">{u.coin.toLocaleString()}</td>

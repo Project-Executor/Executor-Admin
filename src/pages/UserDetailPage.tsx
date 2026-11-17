@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { adjustCoin, changeRole, fetchUserDetail } from '../api/admin'
+import { adjustCoin, changeRole, fetchUserDetail, suspendUser, unsuspendUser } from '../api/admin'
 import { ApiError } from '../api/client'
 import type { AdminUserDetail, Role } from '../api/types'
 import { useAuth } from '../auth/context'
-import RoleBadge from '../components/RoleBadge.tsx'
+import RoleBadge, { SuspendedBadge } from '../components/RoleBadge.tsx'
+import { isSuspended, suspensionLabel } from '../components/suspension'
 import { toReceiver } from './mailState'
 import type { MailPageState } from './mailState'
 
@@ -60,7 +61,8 @@ export default function UserDetailPage() {
       </p>
       <div className="row title-row">
         <h2>
-          {name} <span className="muted">#{user.userId}</span> <RoleBadge role={user.role} />
+          {name} <span className="muted">#{user.userId}</span> <RoleBadge role={user.role} />{' '}
+          <SuspendedBadge until={user.suspendedUntil} />
         </h2>
         <button
           type="button"
@@ -100,6 +102,8 @@ export default function UserDetailPage() {
         <CoinForm user={user} onDone={(coin) => setUser({ ...user, coin })} />
         <RoleForm user={user} isSelf={isSelf} onDone={load} />
       </div>
+
+      <SuspendForm user={user} isSelf={isSelf} onDone={load} />
 
       <div className="card table-wrap">
         <h3 className="card-title">보유 아이템 ({user.items.length})</h3>
@@ -269,5 +273,140 @@ function RoleForm({ user, isSelf, onDone }: { user: AdminUserDetail; isSelf: boo
       {error && <p className="error">{error}</p>}
       {result && <p className="success">{result}</p>}
     </div>
+  )
+}
+
+/** 정지 기간 고르기. 'custom'이면 직접 입력한 시각 */
+const PERIODS = [
+  { value: '1', label: '1일' },
+  { value: '3', label: '3일' },
+  { value: '7', label: '7일' },
+  { value: '30', label: '30일' },
+  { value: 'permanent', label: '영구' },
+  { value: 'custom', label: '직접 입력' },
+] as const
+type Period = (typeof PERIODS)[number]['value']
+const REASON_MAX = 200
+
+function SuspendForm({ user, isSelf, onDone }: { user: AdminUserDetail; isSelf: boolean; onDone: () => Promise<void> }) {
+  const suspended = isSuspended(user)
+  const [period, setPeriod] = useState<Period>('7')
+  const [customLocal, setCustomLocal] = useState('')
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState('')
+  const [result, setResult] = useState('')
+  const [busy, setBusy] = useState(false)
+  const who = user.nickname ?? user.email
+
+  /** 기한 (ISO UTC, 영구면 null). 문제가 있으면 { error } */
+  function deadline(): { until: string | null } | { error: string } {
+    if (period === 'permanent') return { until: null }
+    let d: Date
+    if (period === 'custom') {
+      if (!customLocal) return { error: '정지 기한을 고르세요.' }
+      d = new Date(customLocal) // datetime-local은 PC 시간대 기준
+    } else {
+      d = new Date(Date.now() + Number(period) * 24 * 60 * 60 * 1000)
+    }
+    if (Number.isNaN(d.getTime()) || d.getTime() <= Date.now()) return { error: '정지 기한은 지금보다 뒤여야 합니다.' }
+    return { until: d.toISOString().replace(/\.\d{3}Z$/, 'Z') }
+  }
+
+  async function suspend(e: FormEvent) {
+    e.preventDefault()
+    setError('')
+    setResult('')
+    const r = reason.trim()
+    if (!r) {
+      setError('정지 사유를 입력하세요. 사용자가 로그인할 때 이 사유를 봅니다.')
+      return
+    }
+    const d = deadline()
+    if ('error' in d) {
+      setError(d.error)
+      return
+    }
+    const label = d.until === null ? '영구' : `${new Date(d.until).toLocaleString()}까지`
+    const verb = suspended ? '정지 기간을 바꿀까요' : '정지할까요'
+    if (!window.confirm(`${who}을(를) ${label} ${verb}?
+
+사유: ${r}
+
+로그인과 토큰 재발급이 막힙니다. 이미 접속 중이면 최대 30분 뒤에 끊깁니다.`)) return
+
+    setBusy(true)
+    try {
+      await suspendUser(user.userId, d.until, r)
+      await onDone()
+      setReason('')
+      setResult(`${label} 정지했습니다.`)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function unsuspend() {
+    setError('')
+    setResult('')
+    if (!window.confirm(`${who}의 정지를 풀까요?`)) return
+    setBusy(true)
+    try {
+      await unsuspendUser(user.userId)
+      await onDone()
+      setResult('정지를 풀었습니다. 바로 로그인할 수 있습니다.')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className={`card form compact${suspended ? ' suspended-box' : ''}`} onSubmit={suspend}>
+      <h3 className="card-title">계정 정지</h3>
+      {suspended && user.suspendedUntil ? (
+        <div className="row">
+          <p>
+            <b>정지 중</b> · {suspensionLabel(user.suspendedUntil)}
+            {user.suspendReason && <> · 사유: {user.suspendReason}</>}
+          </p>
+          <button type="button" className="secondary" disabled={busy} onClick={() => void unsuspend()}>
+            정지 풀기
+          </button>
+        </div>
+      ) : (
+        <p className="muted small">정지하면 로그인과 토큰 재발급이 막히고, 사용자는 로그인할 때 기한과 사유를 봅니다.</p>
+      )}
+
+      {isSelf ? (
+        <p className="muted small">자기 자신은 정지할 수 없습니다.</p>
+      ) : (
+        <>
+          <div className="row">
+            {PERIODS.map((p) => (
+              <label key={p.value} className="inline">
+                <input type="radio" checked={period === p.value} onChange={() => setPeriod(p.value)} /> {p.label}
+              </label>
+            ))}
+            {period === 'custom' && (
+              <input type="datetime-local" value={customLocal} onChange={(e) => setCustomLocal(e.target.value)} />
+            )}
+          </div>
+          <label>
+            사유 ({reason.trim().length}/{REASON_MAX}, 사용자에게 보임)
+            <input value={reason} maxLength={REASON_MAX} onChange={(e) => setReason(e.target.value)} />
+          </label>
+          <div className="row">
+            <button type="submit" className="danger" disabled={busy}>
+              {busy ? '처리 중...' : suspended ? '정지 기간 바꾸기' : '정지하기'}
+            </button>
+          </div>
+        </>
+      )}
+      {error && <p className="error">{error}</p>}
+      {result && <p className="success">{result}</p>}
+    </form>
   )
 }

@@ -1,5 +1,5 @@
 // 관리자 화면에서 쓰는 API. 기능을 추가할 때 여기에 함수를 더한다.
-import { get, patch, post } from './client'
+import { api, get, patch, post, put } from './client'
 import type {
   AdminCoinResponse,
   AdminItem,
@@ -47,6 +47,13 @@ export const adjustCoin = (userId: number, amount: number) =>
 
 /** 권한 변경. 자기 자신은 바꿀 수 없다(400). 다음 토큰 재발급(최대 30분 뒤)부터 적용 */
 export const changeRole = (userId: number, role: Role) => patch<AdminUser>(`/admin/users/${userId}/role`, { role })
+
+/** 계정 정지. until(ISO UTC)이 null이면 영구. 이미 정지 중이면 새 값으로 바꾼다 */
+export const suspendUser = (userId: number, until: string | null, reason: string) =>
+  put<AdminUser>(`/admin/users/${userId}/suspension`, { until, reason })
+
+/** 정지 해제 */
+export const unsuspendUser = (userId: number) => api<AdminUser>('DELETE', `/admin/users/${userId}/suspension`)
 
 /** 우편 발송. 없는 사용자가 있으면 404로 아무에게도 보내지 않는다 */
 export const sendMail = (request: AdminMailRequest) => post<AdminMailResponse>('/admin/mails', request)

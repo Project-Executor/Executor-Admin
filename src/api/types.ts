@@ -80,7 +80,13 @@ export interface AdminUser {
   role: Role
   coin: number
   createdAt: string
+  /** 정지 기한. null이면 정지 아님, PERMANENT_UNTIL이면 영구. 지난 시각이면 이미 풀린 것 */
+  suspendedUntil: string | null
+  suspendReason: string | null
 }
+
+/** 영구 정지를 나타내는 기한 (서버 Account.PERMANENT) */
+export const PERMANENT_UNTIL = '9999-12-31T23:59:59Z'
 
 /** GET /admin/users/{id} */
 export interface AdminUserDetail extends AdminUser {

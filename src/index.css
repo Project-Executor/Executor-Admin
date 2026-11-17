@@ -356,6 +356,11 @@ button.chip.add {
   color: var(--danger);
 }
 
+.badge.suspended {
+  background: #2b2f36;
+  color: #fff;
+}
+
 /* 표 */
 .table-wrap {
   padding: 0;
@@ -505,4 +510,9 @@ button.danger {
   .info {
     grid-template-columns: 90px 1fr;
   }
+}
+
+.suspended-box {
+  border-color: #e7b4b4;
+  background: #fff7f7;
 }
