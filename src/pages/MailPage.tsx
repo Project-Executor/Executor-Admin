@@ -1,29 +1,31 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { fetchItems, searchUsers, sendMail } from '../api/admin'
+import { useLocation } from 'react-router-dom'
+import { fetchItems, fetchUsers, sendMail } from '../api/admin'
 import { ApiError } from '../api/client'
-import type { AdminItem, AdminMailRequest, UserSummary } from '../api/types'
+import type { AdminItem, AdminMailRequest, AdminUser } from '../api/types'
+import RoleBadge from '../components/RoleBadge.tsx'
+import type { MailPageState, Receiver } from './mailState'
 
 const TITLE_MAX = 100
 const CONTENT_MAX = 2000
 const COIN_MAX = 1_000_000
 const RECEIVER_MAX = 1000
 
-interface Receiver {
-  userId: number
-  nickname: string | null
-}
-
 /** 우편 발송 (POST /api/admin/mails). 전체 또는 지정한 사용자에게 코인·아이템을 첨부해 보낸다 */
 export default function MailPage() {
+  const location = useLocation()
   const [items, setItems] = useState<AdminItem[]>([])
   const [itemsError, setItemsError] = useState('')
 
   const [toAll, setToAll] = useState(false)
-  const [receivers, setReceivers] = useState<Receiver[]>([])
+  // 유저 관리 화면에서 넘어오면 받는 사람이 채워져 있다
+  const [receivers, setReceivers] = useState<Receiver[]>(
+    () => (location.state as MailPageState | null)?.receivers ?? [],
+  )
   const [idInput, setIdInput] = useState('')
   const [keyword, setKeyword] = useState('')
-  const [results, setResults] = useState<UserSummary[] | null>(null)
+  const [results, setResults] = useState<AdminUser[] | null>(null)
   const [searching, setSearching] = useState(false)
 
   const [title, setTitle] = useState('')
@@ -71,7 +73,7 @@ export default function MailPage() {
     if (!k) return
     setSearching(true)
     try {
-      setResults((await searchUsers(k)).content)
+      setResults((await fetchUsers({ keyword: k, size: 20 })).content)
     } catch (e) {
       setResults([])
       setError(e instanceof ApiError ? e.message : String(e))
@@ -172,7 +174,7 @@ export default function MailPage() {
             <>
               <div className="row">
                 <input
-                  placeholder="닉네임 검색"
+                  placeholder="닉네임·이메일·ID 검색"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   onKeyDown={(e) => {
@@ -209,9 +211,11 @@ export default function MailPage() {
                       type="button"
                       key={u.userId}
                       className="chip add"
-                      onClick={() => addReceivers([{ userId: u.userId, nickname: u.nickname }])}
+                      title={u.email}
+                      onClick={() => addReceivers([{ userId: u.userId, nickname: u.nickname, role: u.role }])}
                     >
                       + {u.nickname ?? '(닉네임 없음)'} <small>#{u.userId}</small>
+                      <RoleBadge role={u.role} />
                     </button>
                   ))}
                 </div>
@@ -222,6 +226,7 @@ export default function MailPage() {
                 {receivers.map((r) => (
                   <span key={r.userId} className="chip">
                     {r.nickname ?? 'ID'} <small>#{r.userId}</small>
+                    {r.role && <RoleBadge role={r.role} />}
                     <button
                       type="button"
                       aria-label="빼기"

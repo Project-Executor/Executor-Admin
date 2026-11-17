@@ -70,3 +70,14 @@ export interface AdminMailRequest {
 export interface AdminMailResponse {
   sentCount: number
 }
+
+// ---------- 유저 (GET /admin/users) ----------
+export interface AdminUser {
+  userId: number
+  email: string
+  /** 가입 후 닉네임을 정하기 전이면 null */
+  nickname: string | null
+  role: Role
+  coin: number
+  createdAt: string
+}
