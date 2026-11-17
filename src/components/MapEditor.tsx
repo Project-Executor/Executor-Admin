@@ -1,0 +1,255 @@
+import { useEffect, useState } from 'react'
+import { fillBorder, nextId, OBJECT_INFO, OBJECT_TYPES, objectAt, resize, validate, MAX_SIZE, MIN_SIZE } from './mapData'
+import type { GridMap, MapObject, MapObjectType } from './mapData'
+
+/** 팔레트 도구 */
+type Tool = 'wall' | 'floor' | 'player' | 'erase' | 'select' | MapObjectType
+
+const TERRAIN_TOOLS: { tool: Tool; label: string; symbol: string }[] = [
+  { tool: 'select', label: '선택', symbol: '↖' },
+  { tool: 'wall', label: '벽', symbol: '#' },
+  { tool: 'floor', label: '바닥', symbol: '·' },
+  { tool: 'player', label: '시작 위치', symbol: 'P' },
+  { tool: 'erase', label: '오브젝트 지우기', symbol: '⌫' },
+]
+
+/**
+ * 격자 맵 편집기. 칸을 누르거나 끌어서 칠한다.
+ * - 벽·바닥: 끌어서 여러 칸. 벽을 칠하면 그 칸의 오브젝트는 지워진다
+ * - 오브젝트: 바닥에만, 한 칸에 하나. 놓으면 바로 선택되어 속성을 고칠 수 있다
+ */
+export default function MapEditor({ map, onChange }: { map: GridMap; onChange: (next: GridMap) => void }) {
+  const [tool, setTool] = useState<Tool>('wall')
+  const [painting, setPainting] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
+  const [sizeW, setSizeW] = useState(String(map.width))
+  const [sizeH, setSizeH] = useState(String(map.height))
+
+  // 마우스를 격자 밖에서 떼도 칠하기를 멈춘다
+  useEffect(() => {
+    const stop = () => setPainting(false)
+    window.addEventListener('mouseup', stop)
+    return () => window.removeEventListener('mouseup', stop)
+  }, [])
+
+  const selected = selectedId ? map.objects.find((o) => o.id === selectedId) ?? null : null
+  const issues = validate(map)
+
+  function apply(x: number, y: number, dragging: boolean) {
+    const at = objectAt(map, x, y)
+    switch (tool) {
+      case 'select':
+        if (!dragging) setSelectedId(at?.id ?? null)
+        return
+      case 'wall':
+      case 'floor': {
+        const t = tool === 'wall' ? '#' : '.'
+        if (map.tiles[y][x] === t && !(t === '#' && at)) return
+        const tiles = map.tiles.map((row, ry) => (ry === y ? row.map((c, rx) => (rx === x ? t : c)) : row))
+        const objects = t === '#' ? map.objects.filter((o) => o !== at) : map.objects
+        onChange({ ...map, tiles, objects })
+        return
+      }
+      case 'player': {
+        if (dragging) return
+        onChange({ ...map, tiles: floorAt(map, x, y), player: { x, y }, objects: map.objects.filter((o) => o !== at) })
+        return
+      }
+      case 'erase':
+        if (at) onChange({ ...map, objects: map.objects.filter((o) => o !== at) })
+        return
+      default: {
+        if (dragging && at?.type === tool) return
+        if (x === map.player.x && y === map.player.y) return
+        const id = nextId(map, tool)
+        const obj: MapObject = { id, type: tool, x, y, ...OBJECT_INFO[tool].defaults }
+        // 출구는 하나뿐이라 새로 놓으면 옮긴다
+        const others = map.objects.filter((o) => o !== at && !(tool === 'exit' && o.type === 'exit'))
+        onChange({ ...map, tiles: floorAt(map, x, y), objects: [...others, obj] })
+        if (!dragging) setSelectedId(id)
+      }
+    }
+  }
+
+  function updateSelected(patch: Record<string, unknown>) {
+    if (!selected) return
+    const next = { ...selected, ...patch }
+    for (const [k, v] of Object.entries(patch)) if (v === undefined) delete next[k]
+    onChange({ ...map, objects: map.objects.map((o) => (o === selected ? next : o)) })
+    if (typeof patch.id === 'string') setSelectedId(patch.id)
+  }
+
+  function applySize() {
+    const w = Number(sizeW)
+    const h = Number(sizeH)
+    if (!Number.isInteger(w) || !Number.isInteger(h)) return
+    const next = resize(map, w, h)
+    setSizeW(String(next.width))
+    setSizeH(String(next.height))
+    onChange(next)
+  }
+
+  const cell = map.width > 24 || map.height > 18 ? 22 : 30
+
+  return (
+    <div className="map-editor">
+      <div className="palette">
+        {TERRAIN_TOOLS.map((t) => (
+          <button key={t.tool} type="button" className={tool === t.tool ? 'tool active' : 'tool'} onClick={() => setTool(t.tool)}>
+            <span className={`swatch ${t.tool}`}>{t.symbol}</span> {t.label}
+          </button>
+        ))}
+        <span className="palette-sep" />
+        {OBJECT_TYPES.map((t) => (
+          <button key={t} type="button" className={tool === t ? 'tool active' : 'tool'} onClick={() => setTool(t)}>
+            <span className={`swatch obj-${t}`}>{OBJECT_INFO[t].symbol}</span> {OBJECT_INFO[t].label}
+          </button>
+        ))}
+      </div>
+
+      <div className="map-work">
+        <div>
+          <div
+            className="map-grid"
+            style={{ gridTemplateColumns: `repeat(${map.width}, ${cell}px)`, gridAutoRows: `${cell}px` }}
+            onMouseLeave={() => setHover(null)}
+          >
+            {map.tiles.map((row, y) =>
+              row.map((t, x) => {
+                const o = objectAt(map, x, y)
+                const isPlayer = map.player.x === x && map.player.y === y
+                const cls = ['cell', t === '#' ? 'wall' : 'floor']
+                if (o) cls.push(`obj-${o.type}`)
+                if (isPlayer) cls.push('player')
+                if (o && o.id === selectedId) cls.push('selected')
+                return (
+                  <button
+                    key={`${x},${y}`}
+                    type="button"
+                    className={cls.join(' ')}
+                    title={`(${x}, ${y})${o ? ` ${o.id}` : ''}${isPlayer ? ' 시작 위치' : ''}`}
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      setPainting(true)
+                      apply(x, y, false)
+                    }}
+                    onMouseEnter={() => {
+                      setHover({ x, y })
+                      if (painting) apply(x, y, true)
+                    }}
+                  >
+                    {isPlayer ? 'P' : o ? (OBJECT_INFO[o.type as MapObjectType]?.symbol ?? '?') : ''}
+                  </button>
+                )
+              }),
+            )}
+          </div>
+          <p className="muted small map-status">
+            {map.width} × {map.height} · 오브젝트 {map.objects.length}개{hover ? ` · 칸 (${hover.x}, ${hover.y})` : ''}
+          </p>
+        </div>
+
+        <div className="map-side">
+          <div className="map-box">
+            <b className="small">크기</b>
+            <div className="row">
+              <input type="number" min={MIN_SIZE} max={MAX_SIZE} value={sizeW} onChange={(e) => setSizeW(e.target.value)} aria-label="가로" className="size-input" />
+              ×
+              <input type="number" min={MIN_SIZE} max={MAX_SIZE} value={sizeH} onChange={(e) => setSizeH(e.target.value)} aria-label="세로" className="size-input" />
+              <button type="button" className="secondary small-btn" onClick={applySize}>
+                적용
+              </button>
+            </div>
+            <button type="button" className="secondary small-btn" onClick={() => onChange(fillBorder(map))}>
+              테두리 벽 채우기
+            </button>
+          </div>
+
+          <div className="map-box">
+            <b className="small">선택한 오브젝트</b>
+            {selected ? (
+              <ObjectFields key={selected.id} obj={selected} onChange={updateSelected} onDelete={() => {
+                onChange({ ...map, objects: map.objects.filter((o) => o !== selected) })
+                setSelectedId(null)
+              }} />
+            ) : (
+              <p className="muted small">‘선택’ 도구로 오브젝트를 누르면 속성을 고칠 수 있습니다. 새로 놓은 오브젝트는 바로 선택됩니다.</p>
+            )}
+          </div>
+
+          <div className={`map-box ${issues.length ? 'warn' : 'ok'}`}>
+            <b className="small">{issues.length ? `확인할 점 ${issues.length}개` : '규칙 검사 통과'}</b>
+            {issues.length > 0 && (
+              <ul className="issues">
+                {issues.map((m) => (
+                  <li key={m}>{m}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function floorAt(map: GridMap, x: number, y: number) {
+  return map.tiles[y][x] === '.' ? map.tiles : map.tiles.map((row, ry) => (ry === y ? row.map((c, rx) => (rx === x ? '.' : c)) : row))
+}
+
+/** 오브젝트 종류별 속성 입력 (docs/map-data.md 2장) */
+function ObjectFields({ obj, onChange, onDelete }: { obj: MapObject; onChange: (patch: Record<string, unknown>) => void; onDelete: () => void }) {
+  const [id, setId] = useState(obj.id)
+  const intOrUndefined = (v: string) => (v.trim() === '' ? undefined : Number(v))
+
+  return (
+    <div className="obj-fields">
+      <p className="small">
+        {OBJECT_INFO[obj.type as MapObjectType]?.label ?? obj.type} · ({obj.x}, {obj.y})
+      </p>
+      <label>
+        id (맵 안에서 고유)
+        <input value={id} onChange={(e) => setId(e.target.value)} onBlur={() => id.trim() && id !== obj.id && onChange({ id: id.trim() })} />
+      </label>
+      {obj.type === 'breakable' && (
+        <label>
+          hp (부딪혀야 하는 횟수)
+          <input type="number" min={1} value={String(obj.hp ?? 1)} onChange={(e) => onChange({ hp: intOrUndefined(e.target.value) })} />
+        </label>
+      )}
+      {(obj.type === 'key' || obj.type === 'door') && (
+        <label>
+          keyId (열쇠와 문이 같아야 열림)
+          <input value={String(obj.keyId ?? '')} onChange={(e) => onChange({ keyId: e.target.value })} />
+        </label>
+      )}
+      {obj.type === 'npc' && (
+        <>
+          <label>
+            이름 (name)
+            <input value={String(obj.name ?? '')} onChange={(e) => onChange({ name: e.target.value })} />
+          </label>
+          <label>
+            대화 ID (dialogues의 키)
+            <input value={String(obj.dialogueId ?? '')} onChange={(e) => onChange({ dialogueId: e.target.value })} />
+          </label>
+        </>
+      )}
+      {obj.type === 'turnReset' && (
+        <>
+          <label>
+            turns (비우면 스테이지 기준 턴)
+            <input type="number" min={1} value={obj.turns === undefined ? '' : String(obj.turns)} onChange={(e) => onChange({ turns: intOrUndefined(e.target.value) })} />
+          </label>
+          <label className="inline">
+            <input type="checkbox" checked={obj.once !== false} onChange={(e) => onChange({ once: e.target.checked })} /> 한 번 쓰면 사라짐 (once)
+          </label>
+        </>
+      )}
+      <button type="button" className="danger small-btn" onClick={onDelete}>
+        이 오브젝트 지우기
+      </button>
+    </div>
+  )
+}

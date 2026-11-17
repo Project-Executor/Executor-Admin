@@ -6,6 +6,9 @@ import { ApiError } from '../api/client'
 import { STAGE_TYPE_LABEL } from '../api/types'
 import type { AdminOperationTree, AdminStage, AdminStageRequest, StageType } from '../api/types'
 import { formatDateTime } from '../components/datetime'
+import MapEditor from '../components/MapEditor.tsx'
+import { fromJson, newMap, toJson, validate } from '../components/mapData'
+import type { GridMap } from '../components/mapData'
 
 const TITLE_MAX = 100
 const TYPES = Object.keys(STAGE_TYPE_LABEL) as StageType[]
@@ -44,7 +47,11 @@ export default function StageEditPage() {
   const [title, setTitle] = useState('')
   const [parMoves, setParMoves] = useState('20')
   const [rewardCoin, setRewardCoin] = useState('0')
-  const [mapText, setMapText] = useState('{\n  \n}')
+  // 맵은 격자(grid)가 기준이고, JSON 탭에서 글로 고친 것은 격자로 돌아올 때 다시 읽는다
+  const [grid, setGrid] = useState<GridMap>(() => fromJson(newMap()))
+  const [gridKey, setGridKey] = useState(0)
+  const [mapMode, setMapMode] = useState<'grid' | 'json'>('grid')
+  const [mapText, setMapText] = useState('')
   const [mapCheck, setMapCheck] = useState('')
 
   const [error, setError] = useState('')
@@ -59,8 +66,40 @@ export default function StageEditPage() {
     setTitle(s.title)
     setParMoves(String(s.parMoves))
     setRewardCoin(String(s.rewardCoin))
-    setMapText(JSON.stringify(s.mapData, null, 2))
+    replaceGrid(fromJson(s.mapData))
+    setMapMode('grid')
     setMapCheck('')
+  }
+
+  /** 격자를 통째로 바꾼다 (편집기를 새로 그려 크기 입력란 등도 맞춘다) */
+  function replaceGrid(next: GridMap) {
+    setGrid(next)
+    setGridKey((k) => k + 1)
+  }
+
+  function switchMode(next: 'grid' | 'json') {
+    if (next === mapMode) return
+    setError('')
+    setMapCheck('')
+    if (next === 'json') {
+      setMapText(JSON.stringify(toJson(grid), null, 2))
+      setMapMode('json')
+      return
+    }
+    const r = parseMapData(mapText)
+    if ('error' in r) {
+      setError(`JSON을 고쳐야 격자로 돌아갈 수 있습니다. ${r.error}`)
+      return
+    }
+    replaceGrid(fromJson(r.value))
+    setMapMode('grid')
+  }
+
+  /** 지금 편집 중인 맵 데이터 */
+  function currentMap(): ReturnType<typeof parseMapData> {
+    if (mapMode === 'json') return parseMapData(mapText)
+    const value = toJson(grid)
+    return { value, hintCount: Array.isArray(value.hints) ? value.hints.length : 0 }
   }
 
   useEffect(() => {
@@ -109,7 +148,7 @@ export default function StageEditPage() {
     if (t.length < 1 || t.length > TITLE_MAX) return `제목은 1~${TITLE_MAX}자여야 합니다.`
     if (!Number.isInteger(par) || par < 1 || par > 9999) return '기준 턴은 1~9999 사이 정수여야 합니다.'
     if (!Number.isInteger(coin) || coin < 0) return '보상 코인은 0 이상 정수여야 합니다.'
-    const map = parseMapData(mapText)
+    const map = currentMap()
     if ('error' in map) return map.error
     return { operationId: op, stageNo: no, stageType, title: t, mapData: map.value, parMoves: par, rewardCoin: coin }
   }
@@ -123,6 +162,14 @@ export default function StageEditPage() {
       setError(req)
       return
     }
+    const issues = validate(fromJson(req.mapData))
+    if (
+      issues.length > 0 &&
+      !window.confirm(
+        `맵 규칙에 맞지 않는 점이 ${issues.length}개 있습니다.\n\n- ${issues.slice(0, 5).join('\n- ')}${issues.length > 5 ? '\n…' : ''}\n\n그래도 저장할까요? 게임에서 제대로 동작하지 않을 수 있습니다.`,
+      )
+    )
+      return
     if (!isNew && !window.confirm('저장할까요? 바로 게임에 반영됩니다. 사용자들의 기존 기록은 그대로 남습니다.')) return
     setBusy(true)
     try {
@@ -224,26 +271,59 @@ export default function StageEditPage() {
         </fieldset>
 
         <fieldset>
-          <legend>맵 데이터 (JSON)</legend>
-          <p className="muted small">
-            Executor-Server <code>docs/map-data.md</code> 형식을 따릅니다. 서버는 JSON 객체인지와 hints가 배열인지만 검사합니다.
-          </p>
-          <textarea
-            className="code"
-            rows={22}
-            spellCheck={false}
-            value={mapText}
-            onChange={(e) => {
-              setMapText(e.target.value)
-              setMapCheck('')
-            }}
-          />
-          <div className="row">
-            <button type="button" className="secondary" onClick={checkMap}>
-              검사·정렬
+          <legend>맵</legend>
+          <div className="tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mapMode === 'grid'}
+              className={mapMode === 'grid' ? 'tab active' : 'tab'}
+              onClick={() => switchMode('grid')}
+            >
+              격자 편집
             </button>
-            {mapCheck && <span className="success small">{mapCheck}</span>}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mapMode === 'json'}
+              className={mapMode === 'json' ? 'tab active' : 'tab'}
+              onClick={() => switchMode('json')}
+            >
+              JSON 직접 편집
+            </button>
           </div>
+          {mapMode === 'grid' ? (
+            <>
+              <MapEditor key={gridKey} map={grid} onChange={setGrid} />
+              <p className="muted small">
+                지형·시작 위치·오브젝트는 여기서 고칩니다. 대화(dialogues)·안내(guides)·나레이션(story)·힌트(hints)는 ‘JSON 직접 편집’에서 고치고,
+                격자에서 고쳐도 그대로 유지됩니다.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="muted small">
+                Executor-Server <code>docs/map-data.md</code> 형식입니다. ‘격자 편집’으로 돌아가면 이 JSON을 다시 읽습니다 (지형은 벽{' '}
+                <code>#</code>과 바닥 <code>.</code>만 지원).
+              </p>
+              <textarea
+                className="code"
+                rows={24}
+                spellCheck={false}
+                value={mapText}
+                onChange={(e) => {
+                  setMapText(e.target.value)
+                  setMapCheck('')
+                }}
+              />
+              <div className="row">
+                <button type="button" className="secondary" onClick={checkMap}>
+                  검사·정렬
+                </button>
+                {mapCheck && <span className="success small">{mapCheck}</span>}
+              </div>
+            </>
+          )}
         </fieldset>
 
         {error && <p className="error">{error}</p>}
