@@ -1,5 +1,18 @@
 import { useEffect, useState } from 'react'
-import { fillBorder, nextId, OBJECT_INFO, OBJECT_TYPES, objectAt, resize, validate, MAX_SIZE, MIN_SIZE } from './mapData'
+import {
+  fillBorder,
+  maxUnstable,
+  nextCheckpointOrder,
+  nextId,
+  OBJECT_INFO,
+  OBJECT_TYPES,
+  objectAt,
+  resize,
+  setMaxUnstable,
+  validate,
+  MAX_SIZE,
+  MIN_SIZE,
+} from './mapData'
 import type { GridMap, MapObject, MapObjectType } from './mapData'
 
 /** 팔레트 도구 */
@@ -64,6 +77,8 @@ export default function MapEditor({ map, onChange }: { map: GridMap; onChange: (
         if (x === map.player.x && y === map.player.y) return
         const id = nextId(map, tool)
         const obj: MapObject = { id, type: tool, x, y, ...OBJECT_INFO[tool].defaults }
+        // 체크포인트는 놓을 때마다 다음 구간 번호를 붙인다
+        if (tool === 'checkpoint') obj.order = at?.type === 'checkpoint' ? at.order : nextCheckpointOrder(map)
         // 출구는 하나뿐이라 새로 놓으면 옮긴다
         const others = map.objects.filter((o) => o !== at && !(tool === 'exit' && o.type === 'exit'))
         onChange({ ...map, tiles: floorAt(map, x, y), objects: [...others, obj] })
@@ -139,7 +154,7 @@ export default function MapEditor({ map, onChange }: { map: GridMap; onChange: (
                       if (painting) apply(x, y, true)
                     }}
                   >
-                    {isPlayer ? 'P' : o ? (OBJECT_INFO[o.type as MapObjectType]?.symbol ?? '?') : ''}
+                    {isPlayer ? 'P' : o ? (o.type === 'checkpoint' ? String(o.order ?? 'S') : (OBJECT_INFO[o.type as MapObjectType]?.symbol ?? '?')) : ''}
                   </button>
                 )
               }),
@@ -164,6 +179,27 @@ export default function MapEditor({ map, onChange }: { map: GridMap; onChange: (
             <button type="button" className="secondary small-btn" onClick={() => onChange(fillBorder(map))}>
               테두리 벽 채우기
             </button>
+          </div>
+
+          <div className="map-box">
+            <b className="small">별 2 조건</b>
+            <label>
+              허용하는 불안정 체크포인트 수 (stars.maxUnstable, 출구 포함)
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={String(maxUnstable(map))}
+                onChange={(e) => {
+                  const n = Number(e.target.value)
+                  if (Number.isInteger(n) && n >= 0) onChange(setMaxUnstable(map, n))
+                }}
+              />
+            </label>
+            <p className="muted small">
+              체크포인트 {map.objects.filter((o) => o.type === 'checkpoint').length}개 · 구간 {map.objects.filter((o) => o.type === 'checkpoint').length + 1}개. 첫 구간의 턴은 스테이지
+              기준 턴입니다.
+            </p>
           </div>
 
           <div className="map-box">
@@ -236,14 +272,15 @@ function ObjectFields({ obj, onChange, onDelete }: { obj: MapObject; onChange: (
           </label>
         </>
       )}
-      {obj.type === 'turnReset' && (
+      {obj.type === 'checkpoint' && (
         <>
           <label>
-            turns (비우면 스테이지 기준 턴)
-            <input type="number" min={1} value={obj.turns === undefined ? '' : String(obj.turns)} onChange={(e) => onChange({ turns: intOrUndefined(e.target.value) })} />
+            order (구간 번호, 플레이 순서대로 1부터)
+            <input type="number" min={1} value={obj.order === undefined ? '' : String(obj.order)} onChange={(e) => onChange({ order: intOrUndefined(e.target.value) })} />
           </label>
-          <label className="inline">
-            <input type="checkbox" checked={obj.once !== false} onChange={(e) => onChange({ once: e.target.checked })} /> 한 번 쓰면 사라짐 (once)
+          <label>
+            turns (여기서 시작하는 구간의 턴)
+            <input type="number" min={1} value={obj.turns === undefined ? '' : String(obj.turns)} onChange={(e) => onChange({ turns: intOrUndefined(e.target.value) })} />
           </label>
         </>
       )}

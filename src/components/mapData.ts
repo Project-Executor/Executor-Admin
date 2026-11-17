@@ -3,7 +3,7 @@
 
 export type Tile = '#' | '.'
 
-export type MapObjectType = 'exit' | 'crate' | 'breakable' | 'key' | 'door' | 'npc' | 'turnReset'
+export type MapObjectType = 'exit' | 'crate' | 'breakable' | 'key' | 'door' | 'npc' | 'checkpoint'
 
 export interface MapObject {
   id: string
@@ -35,7 +35,7 @@ export const OBJECT_INFO: Record<MapObjectType, { label: string; symbol: string;
   key: { label: '열쇠', symbol: 'K', defaults: { keyId: 'key1' } },
   door: { label: '잠긴 문', symbol: 'D', defaults: { keyId: 'key1' } },
   npc: { label: '인물', symbol: 'N', defaults: { name: '인물', dialogueId: 'npc1' } },
-  turnReset: { label: '턴 리셋', symbol: 'R', defaults: { once: true } },
+  checkpoint: { label: '체크포인트', symbol: 'S', defaults: { turns: 10 } },
 }
 
 export const OBJECT_TYPES = Object.keys(OBJECT_INFO) as MapObjectType[]
@@ -175,14 +175,18 @@ export function validate(map: GridMap): string[] {
     if (o.x < 0 || o.y < 0 || o.x >= w || o.y >= h) issues.push(`${o.id}가 맵 밖 ${pos(o)}에 있습니다.`)
     else if (tiles[o.y][o.x] !== '.') issues.push(`${o.id}가 벽 위 ${pos(o)}에 있습니다.`)
     if (o.x === player.x && o.y === player.y) issues.push(`${o.id}가 시작 위치에 있습니다.`)
-    if (!(o.type in OBJECT_INFO)) issues.push(`${o.id}의 type '${o.type}'은 모르는 종류입니다. (게임에서는 바닥처럼 지나감)`)
+    if (!(o.type in OBJECT_INFO) && o.type !== 'turnReset') issues.push(`${o.id}의 type '${o.type}'은 모르는 종류입니다. (게임에서는 바닥처럼 지나감)`)
   }
   for (const [key, n] of cells) if (n > 1) issues.push(`(${key.replace(',', ', ')}) 칸에 오브젝트가 ${n}개 있습니다.`)
 
   for (const o of objects) {
     if (o.type === 'breakable' && o.hp !== undefined && !(Number.isInteger(o.hp) && (o.hp as number) >= 1)) issues.push(`${o.id}의 hp는 1 이상 정수여야 합니다.`)
     if ((o.type === 'key' || o.type === 'door') && (typeof o.keyId !== 'string' || !o.keyId)) issues.push(`${o.id}에 keyId가 없습니다.`)
-    if (o.type === 'turnReset' && o.turns !== undefined && !(Number.isInteger(o.turns) && (o.turns as number) >= 1)) issues.push(`${o.id}의 turns는 1 이상 정수여야 합니다.`)
+    if (o.type === 'checkpoint') {
+      if (!(Number.isInteger(o.turns) && (o.turns as number) >= 1)) issues.push(`${o.id}의 turns(구간 턴)는 1 이상 정수여야 합니다.`)
+      if (!(Number.isInteger(o.order) && (o.order as number) >= 1)) issues.push(`${o.id}의 order(구간 번호)는 1 이상 정수여야 합니다.`)
+    }
+    if (o.type === 'turnReset') issues.push(`${o.id}: 턴 리셋(turnReset)은 체크포인트(checkpoint)로 바뀌었습니다. 체크포인트로 다시 놓으세요.`)
   }
 
   // 문을 열 열쇠: 맵의 열쇠 또는 대화의 giveKey
@@ -204,5 +208,36 @@ export function validate(map: GridMap): string[] {
   for (const n of objects.filter((o) => o.type === 'npc')) {
     if (typeof n.dialogueId !== 'string' || !(n.dialogueId in dialogues)) issues.push(`${n.id}의 대화 '${String(n.dialogueId)}'가 dialogues에 없습니다. (JSON 탭에서 추가)`)
   }
+  // 체크포인트 순서: 1부터 빠짐·겹침 없이
+  const orders = objects.filter((o) => o.type === 'checkpoint' && Number.isInteger(o.order)).map((o) => o.order as number).sort((a, b) => a - b)
+  const dup = orders.filter((n, i) => i > 0 && orders[i - 1] === n)
+  if (dup.length) issues.push(`체크포인트 order가 겹칩니다: ${[...new Set(dup)].join(', ')}`)
+  const missing = orders.length ? Array.from({ length: orders[orders.length - 1] }, (_, i) => i + 1).filter((n) => !orders.includes(n)) : []
+  if (missing.length) issues.push(`체크포인트 order ${missing.join(', ')}번이 비어 있습니다. 1부터 차례로 매기세요.`)
+
+  const stars = map.rest.stars
+  if (stars !== undefined) {
+    const max = (stars as Record<string, unknown> | null)?.maxUnstable
+    if (stars === null || typeof stars !== 'object' || (max !== undefined && !(Number.isInteger(max) && (max as number) >= 0))) {
+      issues.push('stars.maxUnstable은 0 이상 정수여야 합니다.')
+    }
+  }
   return issues
+}
+
+/** 다음 체크포인트 번호 (지금 가장 큰 order + 1) */
+export function nextCheckpointOrder(map: GridMap) {
+  const orders = map.objects.filter((o) => o.type === 'checkpoint' && Number.isInteger(o.order)).map((o) => o.order as number)
+  return orders.length ? Math.max(...orders) + 1 : 1
+}
+
+/** 별 2 허용 불안정 수 (stars.maxUnstable, 없으면 0) */
+export function maxUnstable(map: GridMap): number {
+  const v = (map.rest.stars as Record<string, unknown> | undefined)?.maxUnstable
+  return Number.isInteger(v) && (v as number) >= 0 ? (v as number) : 0
+}
+
+export function setMaxUnstable(map: GridMap, value: number): GridMap {
+  const stars = { ...((map.rest.stars as Record<string, unknown> | undefined) ?? {}), maxUnstable: value }
+  return { ...map, rest: { ...map.rest, stars } }
 }
