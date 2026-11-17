@@ -5,7 +5,7 @@ import { useAuth } from '../auth/context'
 const MENU: { label: string; path?: string }[] = [
   { label: '홈', path: '/' },
   { label: '우편 발송', path: '/mails' },
-  { label: '공지사항' },
+  { label: '공지사항', path: '/notices' },
   { label: '유저 관리', path: '/users' },
   { label: '신고' },
   { label: '작전·스테이지' },

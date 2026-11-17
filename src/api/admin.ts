@@ -5,6 +5,8 @@ import type {
   AdminItem,
   AdminMailRequest,
   AdminMailResponse,
+  AdminNotice,
+  AdminNoticeRequest,
   AdminUser,
   AdminUserDetail,
   PageResponse,
@@ -57,3 +59,19 @@ export const unsuspendUser = (userId: number) => api<AdminUser>('DELETE', `/admi
 
 /** 우편 발송. 없는 사용자가 있으면 404로 아무에게도 보내지 않는다 */
 export const sendMail = (request: AdminMailRequest) => post<AdminMailResponse>('/admin/mails', request)
+
+// ---------- 공지 ----------
+
+/** 공지 전체 (숨김·예약·종료 포함, 최근 작성순) */
+export const fetchNotices = (page = 0, size = 20) =>
+  get<PageResponse<AdminNotice>>(`/admin/notices?page=${page}&size=${size}`)
+
+export const fetchNotice = (noticeId: number) => get<AdminNotice>(`/admin/notices/${noticeId}`)
+
+export const createNotice = (request: AdminNoticeRequest) => post<AdminNotice>('/admin/notices', request)
+
+export const updateNotice = (noticeId: number, request: AdminNoticeRequest) =>
+  put<AdminNotice>(`/admin/notices/${noticeId}`, request)
+
+export const deleteNotice = (noticeId: number) => api<void>('DELETE', `/admin/notices/${noticeId}`)
+

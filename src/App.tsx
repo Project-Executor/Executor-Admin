@@ -4,6 +4,8 @@ import Layout from './components/Layout.tsx'
 import HomePage from './pages/HomePage.tsx'
 import LoginPage from './pages/LoginPage.tsx'
 import MailPage from './pages/MailPage.tsx'
+import NoticeEditPage from './pages/NoticeEditPage.tsx'
+import NoticesPage from './pages/NoticesPage.tsx'
 import UserDetailPage from './pages/UserDetailPage.tsx'
 import UsersPage from './pages/UsersPage.tsx'
 
@@ -27,9 +29,12 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="mails" element={<MailPage />} />
+        <Route path="notices" element={<NoticesPage />} />
+        <Route path="notices/new" element={<NoticeEditPage key="new" />} />
+        <Route path="notices/:noticeId" element={<NoticeEditPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="users/:userId" element={<UserDetailPage />} />
-        {/* 기능 화면은 기능별 작업에서 추가: notices, reports, stages, items, guidebooks */}
+        {/* 기능 화면은 기능별 작업에서 추가: reports, stages, items, guidebooks */}
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

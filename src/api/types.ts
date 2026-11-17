@@ -116,3 +116,45 @@ export interface AdminCoinResponse {
   /** 조정한 뒤의 코인 */
   coin: number
 }
+
+// ---------- 공지 (/admin/notices) ----------
+export type NoticeCategory = 'NOTICE' | 'UPDATE' | 'EVENT' | 'MAINTENANCE'
+
+export const NOTICE_CATEGORY_LABEL: Record<NoticeCategory, string> = {
+  NOTICE: '공지',
+  UPDATE: '업데이트',
+  EVENT: '이벤트',
+  MAINTENANCE: '점검',
+}
+
+export interface AdminNotice {
+  noticeId: number
+  category: NoticeCategory
+  title: string
+  content: string
+  isPinned: boolean
+  /** false면 숨김 */
+  isVisible: boolean
+  /** 게시 시각. 미래면 예약 */
+  publishedAt: string
+  /** 게시 종료. null이면 계속 */
+  endsAt: string | null
+  /** 지금 게임에 보이는지 */
+  isShown: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AdminNoticeRequest {
+  category: NoticeCategory
+  /** 1~100자 */
+  title: string
+  /** 1~5000자 */
+  content: string
+  isPinned: boolean
+  isVisible: boolean
+  /** ISO UTC. null이면 등록은 지금, 수정은 기존 값 */
+  publishedAt: string | null
+  /** ISO UTC. null이면 계속 */
+  endsAt: string | null
+}
