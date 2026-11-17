@@ -5,6 +5,7 @@ import { fetchUsers } from '../api/admin'
 import { ApiError } from '../api/client'
 import type { AdminUser, PageResponse, Role } from '../api/types'
 import RoleBadge from '../components/RoleBadge.tsx'
+import { toReceiver } from './mailState'
 import type { MailPageState } from './mailState'
 
 const PAGE_SIZE = 20
@@ -65,7 +66,7 @@ export default function UsersPage() {
 
   function mailTo(users: AdminUser[]) {
     const state: MailPageState = {
-      receivers: users.map((u) => ({ userId: u.userId, nickname: u.nickname, role: u.role })),
+      receivers: users.map(toReceiver),
     }
     navigate('/mails', { state })
   }

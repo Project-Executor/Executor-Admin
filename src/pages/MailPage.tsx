@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useLocation } from 'react-router-dom'
-import { fetchItems, fetchUsers, sendMail } from '../api/admin'
+import { fetchItems, fetchUsers, LOOKUP_MAX, lookupUsers, sendMail } from '../api/admin'
 import { ApiError } from '../api/client'
 import type { AdminItem, AdminMailRequest, AdminUser } from '../api/types'
 import RoleBadge from '../components/RoleBadge.tsx'
+import { toReceiver } from './mailState'
 import type { MailPageState, Receiver } from './mailState'
 
 const TITLE_MAX = 100
@@ -26,6 +27,8 @@ export default function MailPage() {
   const [idInput, setIdInput] = useState('')
   const [keyword, setKeyword] = useState('')
   const [results, setResults] = useState<AdminUser[] | null>(null)
+  const [lookingUp, setLookingUp] = useState(false)
+  const [idNotice, setIdNotice] = useState('')
   const [searching, setSearching] = useState(false)
 
   const [title, setTitle] = useState('')
@@ -58,14 +61,39 @@ export default function MailPage() {
     })
   }
 
-  function addIds() {
-    const ids = idInput
-      .split(/[\s,]+/)
-      .map((s) => Number(s))
-      .filter((n) => Number.isInteger(n) && n > 0)
+  /** 입력한 ID들을 서버에서 조회해 사용자 정보와 함께 추가한다. 없는 ID는 추가하지 않고 알려 준다 */
+  async function addIds() {
+    const ids = [
+      ...new Set(
+        idInput
+          .split(/[\s,]+/)
+          .map((s) => Number(s))
+          .filter((n) => Number.isSafeInteger(n) && n > 0),
+      ),
+    ]
     if (ids.length === 0) return
-    addReceivers(ids.map((userId) => ({ userId, nickname: null })))
-    setIdInput('')
+    setError('')
+    setIdNotice('')
+    setLookingUp(true)
+    try {
+      const found: AdminUser[] = []
+      for (let i = 0; i < ids.length; i += LOOKUP_MAX) {
+        found.push(...(await lookupUsers(ids.slice(i, i + LOOKUP_MAX))))
+      }
+      addReceivers(found.map(toReceiver))
+      const foundIds = new Set(found.map((u) => u.userId))
+      const missing = ids.filter((id) => !foundIds.has(id))
+      if (missing.length > 0) {
+        setIdNotice(`없는 ID라서 추가하지 않았습니다: ${missing.join(', ')}`)
+        setIdInput(missing.join(', '))
+      } else {
+        setIdInput('')
+      }
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : String(e))
+    } finally {
+      setLookingUp(false)
+    }
   }
 
   async function search() {
@@ -194,14 +222,15 @@ export default function MailPage() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
-                      addIds()
+                      void addIds()
                     }
                   }}
                 />
-                <button type="button" className="secondary" onClick={addIds}>
-                  ID 추가
+                <button type="button" className="secondary" onClick={() => void addIds()} disabled={lookingUp}>
+                  {lookingUp ? '확인 중...' : 'ID 추가'}
                 </button>
               </div>
+              {idNotice && <p className="error small">{idNotice}</p>}
 
               {results && (
                 <div className="results">
@@ -212,7 +241,7 @@ export default function MailPage() {
                       key={u.userId}
                       className="chip add"
                       title={u.email}
-                      onClick={() => addReceivers([{ userId: u.userId, nickname: u.nickname, role: u.role }])}
+                      onClick={() => addReceivers([toReceiver(u)])}
                     >
                       + {u.nickname ?? '(닉네임 없음)'} <small>#{u.userId}</small>
                       <RoleBadge role={u.role} />
@@ -224,9 +253,9 @@ export default function MailPage() {
               <div className="results">
                 {receivers.length === 0 && <span className="muted small">아직 추가한 사람이 없습니다.</span>}
                 {receivers.map((r) => (
-                  <span key={r.userId} className="chip">
-                    {r.nickname ?? 'ID'} <small>#{r.userId}</small>
-                    {r.role && <RoleBadge role={r.role} />}
+                  <span key={r.userId} className="chip" title={r.email}>
+                    {r.nickname ?? '(닉네임 없음)'} <small>#{r.userId}</small>
+                    <RoleBadge role={r.role} />
                     <button
                       type="button"
                       aria-label="빼기"
@@ -238,7 +267,7 @@ export default function MailPage() {
                 ))}
               </div>
               <p className="muted small">
-                {receivers.length}명 선택 (최대 {RECEIVER_MAX}명). 없는 ID가 섞여 있으면 아무에게도 보내지 않고 그 ID를 알려 줍니다.
+                {receivers.length}명 선택 (최대 {RECEIVER_MAX}명). ID로 추가하면 서버에서 사용자를 확인하고, 없는 ID는 추가하지 않습니다.
               </p>
             </>
           )}

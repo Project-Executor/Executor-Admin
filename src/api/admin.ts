@@ -23,5 +23,11 @@ export function fetchUsers({ keyword = '', role = '', page = 0, size = 20 }: Use
   return get<PageResponse<AdminUser>>(`/admin/users?${q}`)
 }
 
+/** ID로 한 번에 조회할 수 있는 수 (서버 AdminUserService.LOOKUP_MAX) */
+export const LOOKUP_MAX = 100
+
+/** ID로 여러 명 조회 (ID 순). 없는 ID는 결과에서 빠진다 */
+export const lookupUsers = (ids: number[]) => get<AdminUser[]>(`/admin/users/by-ids?ids=${ids.join(',')}`)
+
 /** 우편 발송. 없는 사용자가 있으면 404로 아무에게도 보내지 않는다 */
 export const sendMail = (request: AdminMailRequest) => post<AdminMailResponse>('/admin/mails', request)
