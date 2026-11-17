@@ -294,7 +294,13 @@ export default function StageEditPage() {
           </div>
           {mapMode === 'grid' ? (
             <>
-              <MapEditor key={gridKey} map={grid} onChange={setGrid} />
+              <MapEditor
+                key={gridKey}
+                map={grid}
+                onChange={setGrid}
+                parMoves={Number.isInteger(Number(parMoves)) ? Number(parMoves) : null}
+                onParMoves={(n) => setParMoves(String(n))}
+              />
               <p className="muted small">
                 지형·시작 위치·오브젝트는 여기서 고칩니다. 대화(dialogues)·안내(guides)·나레이션(story)·힌트(hints)는 ‘JSON 직접 편집’에서 고치고,
                 격자에서 고쳐도 그대로 유지됩니다.

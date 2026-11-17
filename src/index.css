@@ -970,6 +970,21 @@ button.tool.active {
   flex: none;
 }
 
+.map-box .segments {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.map-box .segments li.bad,
+.warn-text {
+  color: var(--danger);
+  margin: 0;
+}
+
 .obj-fields {
   display: flex;
   flex-direction: column;

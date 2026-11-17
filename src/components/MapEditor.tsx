@@ -14,6 +14,8 @@ import {
   MIN_SIZE,
 } from './mapData'
 import type { GridMap, MapObject, MapObjectType } from './mapData'
+import { solveMap, TURN_SLACK } from './mapSolver'
+import type { SegmentResult } from './mapSolver'
 
 /** 팔레트 도구 */
 type Tool = 'wall' | 'floor' | 'player' | 'erase' | 'select' | MapObjectType
@@ -31,7 +33,18 @@ const TERRAIN_TOOLS: { tool: Tool; label: string; symbol: string }[] = [
  * - 벽·바닥: 끌어서 여러 칸. 벽을 칠하면 그 칸의 오브젝트는 지워진다
  * - 오브젝트: 바닥에만, 한 칸에 하나. 놓으면 바로 선택되어 속성을 고칠 수 있다
  */
-export default function MapEditor({ map, onChange }: { map: GridMap; onChange: (next: GridMap) => void }) {
+export default function MapEditor({
+  map,
+  onChange,
+  parMoves,
+  onParMoves,
+}: {
+  map: GridMap
+  onChange: (next: GridMap) => void
+  /** 스테이지 기준 턴 (시작 구간의 턴). 최소 턴 계산의 비교와 추천 적용에 쓴다 */
+  parMoves?: number | null
+  onParMoves?: (value: number) => void
+}) {
   const [tool, setTool] = useState<Tool>('wall')
   const [painting, setPainting] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -45,6 +58,31 @@ export default function MapEditor({ map, onChange }: { map: GridMap; onChange: (
     window.addEventListener('mouseup', stop)
     return () => window.removeEventListener('mouseup', stop)
   }, [])
+
+  // 최소 턴 계산 결과와 그때의 맵 (맵이 바뀌면 다시 계산하라고 알린다)
+  const [solved, setSolved] = useState<{ map: GridMap; results: SegmentResult[] } | null>(null)
+
+  function solve() {
+    setSolved({ map, results: solveMap(map, parMoves ?? null) })
+  }
+
+  /** 추천값 적용: 시작 구간은 스테이지 기준 턴, 나머지는 그 구간을 시작하는 체크포인트의 turns */
+  function applyRecommended(results: SegmentResult[]) {
+    let next = map
+    for (const r of results) {
+      if (r.recommended == null) continue
+      if (r.from === 0) {
+        onParMoves?.(r.recommended)
+        continue
+      }
+      next = {
+        ...next,
+        objects: next.objects.map((o) => (o.type === 'checkpoint' && o.order === r.from ? { ...o, turns: r.recommended } : o)),
+      }
+    }
+    onChange(next)
+    setSolved({ map: next, results: solveMap(next, results[0]?.recommended ?? parMoves ?? null) })
+  }
 
   const selected = selectedId ? map.objects.find((o) => o.id === selectedId) ?? null : null
   const issues = validate(map)
@@ -215,6 +253,45 @@ export default function MapEditor({ map, onChange }: { map: GridMap; onChange: (
               }} />
             ) : (
               <p className="muted small">‘선택’ 도구로 오브젝트를 누르면 속성을 고칠 수 있습니다. 새로 놓은 오브젝트는 바로 선택됩니다.</p>
+            )}
+          </div>
+
+          <div className="map-box">
+            <b className="small">최소 턴 계산</b>
+            <p className="muted small">
+              구간마다 가장 짧은 풀이를 찾습니다. 추천 턴 = 최소 × {TURN_SLACK} (올림). 숨겨진 요소 수집은 넣지 않습니다.
+            </p>
+            <button type="button" className="secondary small-btn" onClick={solve}>
+              계산
+            </button>
+            {solved && (
+              <>
+                {solved.map !== map && <p className="small warn-text">맵이 바뀌었습니다. 다시 계산하세요.</p>}
+                <ul className="segments">
+                  {solved.results.map((r) => {
+                    const label = `${r.from === 0 ? '시작' : `체크포인트 ${r.from}`} → ${r.to === 'exit' ? '출구' : `체크포인트 ${r.to}`}`
+                    if (r.minTurns == null) {
+                      return (
+                        <li key={label} className="bad">
+                          {label}: {r.error}
+                        </li>
+                      )
+                    }
+                    const tight = r.currentLimit != null && r.currentLimit < r.minTurns
+                    return (
+                      <li key={label} className={tight ? 'bad' : ''} title={`풀이: ${r.moves}`}>
+                        {label}: 최소 <b>{r.minTurns}</b> · 지금 {r.currentLimit ?? '없음'} · 추천 {r.recommended}
+                        {tight && ' (지금 턴으로는 안정 도착 불가)'}
+                      </li>
+                    )
+                  })}
+                </ul>
+                {solved.map === map && solved.results.some((r) => r.recommended != null) && (
+                  <button type="button" className="small-btn" onClick={() => applyRecommended(solved.results)}>
+                    추천값 적용
+                  </button>
+                )}
+              </>
             )}
           </div>
 
