@@ -883,6 +883,18 @@ button.tool.active {
   color: #fff;
 }
 
+.map-grid .cell.obj-hidden,
+.swatch.obj-hidden {
+  background: #ff5fb0;
+  color: #fff;
+}
+
+.map-grid .cell.obj-anomaly,
+.swatch.obj-anomaly {
+  background: #e0362c;
+  color: #fff;
+}
+
 .map-grid .cell.obj-checkpoint,
 .swatch.obj-checkpoint {
   background: #17a2b8;

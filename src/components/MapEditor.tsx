@@ -200,6 +200,10 @@ export default function MapEditor({ map, onChange }: { map: GridMap; onChange: (
               체크포인트 {map.objects.filter((o) => o.type === 'checkpoint').length}개 · 구간 {map.objects.filter((o) => o.type === 'checkpoint').length + 1}개. 첫 구간의 턴은 스테이지
               기준 턴입니다.
             </p>
+            <p className="muted small">
+              ★3: 숨겨진 요소 {map.objects.filter((o) => o.type === 'hidden').length}개를 모두 모으기
+              {map.objects.some((o) => o.type === 'hidden') ? '' : ' (없으면 ★3을 얻을 수 없음)'}
+            </p>
           </div>
 
           <div className="map-box">
@@ -269,6 +273,24 @@ function ObjectFields({ obj, onChange, onDelete }: { obj: MapObject; onChange: (
           <label>
             대화 ID (dialogues의 키)
             <input value={String(obj.dialogueId ?? '')} onChange={(e) => onChange({ dialogueId: e.target.value })} />
+          </label>
+        </>
+      )}
+      {obj.type === 'hidden' && (
+        <label>
+          이름 (선택, 화면에 표시)
+          <input value={String(obj.name ?? '')} onChange={(e) => onChange({ name: e.target.value || undefined })} />
+        </label>
+      )}
+      {obj.type === 'anomaly' && (
+        <>
+          <label>
+            이름 (name)
+            <input value={String(obj.name ?? '')} onChange={(e) => onChange({ name: e.target.value })} />
+          </label>
+          <label>
+            도감 ID (guidebookId, 도감 화면의 ID)
+            <input type="number" min={1} value={obj.guidebookId === undefined ? '' : String(obj.guidebookId)} onChange={(e) => onChange({ guidebookId: intOrUndefined(e.target.value) })} />
           </label>
         </>
       )}

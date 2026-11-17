@@ -3,7 +3,7 @@
 
 export type Tile = '#' | '.'
 
-export type MapObjectType = 'exit' | 'crate' | 'breakable' | 'key' | 'door' | 'npc' | 'checkpoint'
+export type MapObjectType = 'exit' | 'crate' | 'breakable' | 'key' | 'door' | 'npc' | 'checkpoint' | 'hidden' | 'anomaly'
 
 export interface MapObject {
   id: string
@@ -36,6 +36,8 @@ export const OBJECT_INFO: Record<MapObjectType, { label: string; symbol: string;
   door: { label: '잠긴 문', symbol: 'D', defaults: { keyId: 'key1' } },
   npc: { label: '인물', symbol: 'N', defaults: { name: '인물', dialogueId: 'npc1' } },
   checkpoint: { label: '체크포인트', symbol: 'S', defaults: { turns: 10 } },
+  hidden: { label: '숨겨진 요소', symbol: 'H', defaults: {} },
+  anomaly: { label: '이상 개체', symbol: 'A', defaults: { name: '이상 개체' } },
 }
 
 export const OBJECT_TYPES = Object.keys(OBJECT_INFO) as MapObjectType[]
@@ -185,6 +187,9 @@ export function validate(map: GridMap): string[] {
     if (o.type === 'checkpoint') {
       if (!(Number.isInteger(o.turns) && (o.turns as number) >= 1)) issues.push(`${o.id}의 turns(구간 턴)는 1 이상 정수여야 합니다.`)
       if (!(Number.isInteger(o.order) && (o.order as number) >= 1)) issues.push(`${o.id}의 order(구간 번호)는 1 이상 정수여야 합니다.`)
+    }
+    if (o.type === 'anomaly' && !(Number.isInteger(o.guidebookId) && (o.guidebookId as number) >= 1)) {
+      issues.push(`${o.id}(이상 개체)에 guidebookId(도감 ID)가 없습니다. 만나도 도감이 해금되지 않습니다.`)
     }
     if (o.type === 'turnReset') issues.push(`${o.id}: 턴 리셋(turnReset)은 체크포인트(checkpoint)로 바뀌었습니다. 체크포인트로 다시 놓으세요.`)
   }
