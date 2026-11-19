@@ -256,6 +256,20 @@ export function validate(map: GridMap): string[] {
       } else issues.push(`${at}: 효과 ${i + 1}의 type '${String(e.type)}'은(는) remove 또는 giveKey여야 합니다.`)
     })
   }
+  // 격자 밖 필드의 모양 (JSON 직접 편집에서 대괄호를 빠뜨리는 실수). 게임은 객체 하나도 받아 주지만 고쳐 두는 게 맞다
+  const shape = (name: string, value: unknown, want: 'array' | 'object') => {
+    if (value === undefined || value === null) return
+    const ok = want === 'array' ? Array.isArray(value) : typeof value === 'object' && !Array.isArray(value)
+    if (!ok) issues.push(`${name}는 ${want === 'array' ? '[ ]로 감싼 배열' : '{ }로 감싼 객체'}이어야 합니다.`)
+  }
+  shape('guides', map.rest.guides, 'array')
+  shape('dialogues', map.rest.dialogues, 'object')
+  shape('story', map.rest.story, 'object')
+  const story = map.rest.story as Record<string, unknown> | undefined
+  if (story && typeof story === 'object' && !Array.isArray(story)) {
+    shape('story.intro', story.intro, 'array')
+    shape('story.outro', story.outro, 'array')
+  }
   const cam = map.rest.camera as Record<string, unknown> | undefined
   for (const k of ['width', 'height'] as const) {
     const v = cam?.[k]
