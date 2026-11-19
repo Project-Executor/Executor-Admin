@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { createGuidebook, deleteGuidebook, fetchGuidebooks, fetchOperations, updateGuidebook } from '../api/admin'
+import { createGuidebook, deleteGuidebook, fetchGuidebooks, fetchLayers, fetchOperations, updateGuidebook } from '../api/admin'
 import { ApiError } from '../api/client'
 import { GUIDEBOOK_CATEGORY_LABEL } from '../api/types'
-import type { AdminGuidebook, AdminGuidebookRequest, AdminOperationTree, GuidebookCategory } from '../api/types'
+import { operationLabel } from '../components/operationLabel'
+import type { AdminGuidebook, AdminLayer, AdminGuidebookRequest, AdminOperationTree, GuidebookCategory } from '../api/types'
 
 const TITLE_MAX = 255
 const IMAGE_MAX = 255
@@ -15,6 +16,7 @@ const CATEGORIES = Object.keys(GUIDEBOOK_CATEGORY_LABEL) as GuidebookCategory[]
 export default function GuidebooksPage() {
   const [items, setItems] = useState<AdminGuidebook[] | null>(null)
   const [ops, setOps] = useState<AdminOperationTree[]>([])
+  const [layers, setLayers] = useState<AdminLayer[]>([])
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<GuidebookCategory | ''>('')
   /** null이면 폼 닫힘, 'new'면 등록, 항목이면 수정 */
@@ -25,6 +27,11 @@ export default function GuidebooksPage() {
     fetchGuidebooks()
       .then(setItems)
       .catch((e: unknown) => setError(e instanceof ApiError ? e.message : String(e)))
+    fetchLayers()
+      .then(setLayers)
+      .catch(() => {
+        /* 레이어 이름 없이 작전 번호만 보인다 */
+      })
     fetchOperations()
       .then(setOps)
       .catch(() => {
@@ -71,6 +78,7 @@ export default function GuidebooksPage() {
             key={editing === 'new' ? 'new' : editing.guidebookId}
             item={editing === 'new' ? null : editing}
             ops={ops}
+            layers={layers}
             onSaved={(g) => {
               upsert(g)
               setEditing(g)
@@ -160,12 +168,14 @@ export default function GuidebooksPage() {
 function GuidebookForm({
   item,
   ops,
+  layers,
   onSaved,
   onDeleted,
   onClose,
 }: {
   item: AdminGuidebook | null
   ops: AdminOperationTree[]
+  layers: AdminLayer[]
   onSaved: (g: AdminGuidebook) => void
   onDeleted: (guidebookId: number) => void
   onClose: () => void
@@ -260,7 +270,7 @@ function GuidebookForm({
             <option value="">없음</option>
             {!knownStage && <option value={stageId}>#{stageId}</option>}
             {ops.map((o) => (
-              <optgroup key={o.operationId} label={`${o.sortOrder}. ${o.name}`}>
+              <optgroup key={o.operationId} label={operationLabel(o, layers)}>
                 {o.stages.map((s) => (
                   <option key={s.stageId} value={s.stageId}>
                     {s.stageNo}. {s.title}

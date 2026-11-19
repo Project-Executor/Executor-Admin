@@ -6,7 +6,7 @@ const SHORTCUTS: { to: string; title: string; desc: string }[] = [
   { to: '/users', title: '유저 관리', desc: '검색, 코인 조정, 권한 변경, 정지' },
   { to: '/mails', title: '우편 발송', desc: '전체 또는 지정한 사용자에게 보상' },
   { to: '/notices', title: '공지사항', desc: '게임 공지 작성, 예약, 숨김' },
-  { to: '/stages', title: '작전·스테이지', desc: '공식 스테이지와 맵 데이터' },
+  { to: '/stages', title: '레이어·작전', desc: '레이어·작전·공식 스테이지와 맵 편집' },
   { to: '/items', title: '아이템', desc: '상점 아이템 등록, 판매 중단' },
   { to: '/guidebooks', title: '도감', desc: '이상 개체·용어 항목' },
 ]

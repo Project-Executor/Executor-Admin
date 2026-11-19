@@ -1,6 +1,8 @@
 // 관리자 화면에서 쓰는 API. 기능을 추가할 때 여기에 함수를 더한다.
 import { api, get, patch, post, put } from './client'
 import type {
+  AdminLayer,
+  AdminLayerRequest,
   AdminGuidebook,
   AdminGuidebookRequest,
   AdminCoinResponse,
@@ -108,7 +110,17 @@ export const changeReportStatus = (reportId: number, status: ReportStatus) =>
 
 // ---------- 작전·스테이지 ----------
 
-/** 작전 전체 (표시 순서) + 소속 스테이지 요약 */
+/** 레이어 전체 (순서대로) + 소속 작전 수 */
+export const fetchLayers = () => get<AdminLayer[]>('/admin/layers')
+
+export const createLayer = (request: AdminLayerRequest) => post<AdminLayer>('/admin/layers', request)
+
+export const updateLayer = (layerId: number, request: AdminLayerRequest) => put<AdminLayer>(`/admin/layers/${layerId}`, request)
+
+/** 작전이 남아 있으면 409 LAYER_HAS_OPERATIONS */
+export const deleteLayer = (layerId: number) => api<void>('DELETE', `/admin/layers/${layerId}`)
+
+/** 작전 전체 (플레이 순서: 레이어 -> 작전) + 소속 스테이지 요약 */
 export const fetchOperations = () => get<AdminOperationTree[]>('/admin/operations')
 
 export const createOperation = (request: AdminOperationRequest) => post<AdminOperation>('/admin/operations', request)

@@ -1,25 +1,45 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { createOperation, deleteOperation, deleteStage, fetchOperations, updateOperation } from '../api/admin'
+import {
+  createLayer,
+  createOperation,
+  deleteLayer,
+  deleteOperation,
+  deleteStage,
+  fetchLayers,
+  fetchOperations,
+  updateLayer,
+  updateOperation,
+} from '../api/admin'
 import { ApiError } from '../api/client'
 import { STAGE_TYPE_LABEL } from '../api/types'
-import type { AdminOperationTree, AdminStageSummary } from '../api/types'
+import type { AdminLayer, AdminOperationTree, AdminStageSummary } from '../api/types'
 import { formatDateTime } from '../components/datetime'
 
 const NAME_MAX = 100
 const DESC_MAX = 255
 
-/** 작전·스테이지: 왼쪽 작전 목록, 오른쪽 선택한 작전의 정보와 스테이지 (선택은 ?op=ID) */
+/** 레이어 이름 표시: "L0 · Tutorial" */
+const layerLabel = (l: AdminLayer) => `L${l.sortOrder} · ${l.name}`
+
+/**
+ * 레이어·작전·스테이지. 왼쪽은 레이어(대주제) 아래 작전(소주제)이 들어간 트리, 오른쪽은 고른 것의 정보.
+ * 선택은 주소에 남는다: ?layer=ID (레이어) 또는 ?op=ID (작전)
+ */
 export default function OperationsPage() {
+  const [layers, setLayers] = useState<AdminLayer[] | null>(null)
   const [ops, setOps] = useState<AdminOperationTree[] | null>(null)
   const [error, setError] = useState('')
   const [params, setParams] = useSearchParams()
-  const [creating, setCreating] = useState(false)
+  /** 새로 만드는 중: 레이어, 또는 작전(그 레이어 ID) */
+  const [creating, setCreating] = useState<{ kind: 'layer' } | { kind: 'op'; layerId: number } | null>(null)
 
   const reload = useCallback(async () => {
     try {
-      setOps(await fetchOperations())
+      const [l, o] = await Promise.all([fetchLayers(), fetchOperations()])
+      setLayers(l)
+      setOps(o)
       setError('')
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e))
@@ -28,9 +48,11 @@ export default function OperationsPage() {
 
   useEffect(() => {
     let cancelled = false
-    fetchOperations()
-      .then((res) => {
-        if (!cancelled) setOps(res)
+    Promise.all([fetchLayers(), fetchOperations()])
+      .then(([l, o]) => {
+        if (cancelled) return
+        setLayers(l)
+        setOps(o)
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof ApiError ? e.message : String(e))
@@ -40,80 +62,162 @@ export default function OperationsPage() {
     }
   }, [])
 
-  const selectedId = Number(params.get('op'))
-  const selected = ops?.find((o) => o.operationId === selectedId) ?? ops?.[0] ?? null
+  const selectedOp = ops?.find((o) => o.operationId === Number(params.get('op'))) ?? null
+  const selectedLayer = layers?.find((l) => l.layerId === Number(params.get('layer'))) ?? null
+  // 아무것도 고르지 않았으면 첫 작전
+  const shownOp = !creating && !selectedLayer ? selectedOp ?? ops?.[0] ?? null : null
 
-  function select(operationId: number) {
-    setCreating(false)
+  function selectOp(operationId: number) {
+    setCreating(null)
     setParams({ op: String(operationId) })
   }
 
-  const nextSortOrder = ops && ops.length > 0 ? Math.max(...ops.map((o) => o.sortOrder)) + 1 : 0
+  function selectLayer(layerId: number) {
+    setCreating(null)
+    setParams({ layer: String(layerId) })
+  }
+
+  const opsOf = (layerId: number) => (ops ?? []).filter((o) => o.layerId === layerId)
+  const nextOpOrder = (layerId: number) => {
+    const list = opsOf(layerId)
+    return list.length > 0 ? Math.max(...list.map((o) => o.sortOrder)) + 1 : 1
+  }
+  const nextLayerOrder = layers && layers.length > 0 ? Math.max(...layers.map((l) => l.sortOrder)) + 1 : 0
 
   return (
     <section className="wide">
-      <h2>작전·스테이지</h2>
+      <h2>레이어·작전·스테이지</h2>
       <p className="muted">
-        공식 스테이지는 작전 순서 → 스테이지 번호 순으로 플레이하고, 앞 스테이지를 깨야 다음이 열립니다. 튜토리얼 작전의 순서는 0입니다.
+        스토리는 레이어(대주제) 안에 작전(소주제)이 들어가는 구조입니다. 공식 스테이지는 레이어 순서 → 작전 순서 → 스테이지 번호로 한 줄로 이어서 플레이하고,
+        앞 스테이지를 깨야 다음이 열립니다. 튜토리얼은 레이어 0입니다.
       </p>
       {error && <p className="error">{error}</p>}
 
       <div className="split">
         <aside className="card list-pane">
           <div className="row title-row">
-            <h3 className="card-title">작전</h3>
-            <button type="button" className="small-btn" onClick={() => setCreating(true)}>
-              새 작전
+            <h3 className="card-title">레이어 · 작전</h3>
+            <button type="button" className="small-btn" onClick={() => setCreating({ kind: 'layer' })}>
+              새 레이어
             </button>
           </div>
-          {!ops && !error && <p className="muted small">불러오는 중...</p>}
-          {ops?.length === 0 && <p className="muted small">작전이 없습니다.</p>}
-          <ul className="pick-list">
-            {ops?.map((o) => (
-              <li key={o.operationId}>
+          {(!layers || !ops) && !error && <p className="muted small">불러오는 중...</p>}
+          {layers?.length === 0 && <p className="muted small">레이어가 없습니다. 먼저 레이어를 만드세요.</p>}
+          <ul className="pick-list tree">
+            {layers?.map((l) => (
+              <li key={l.layerId}>
                 <button
                   type="button"
-                  className={!creating && selected?.operationId === o.operationId ? 'pick active' : 'pick'}
-                  onClick={() => select(o.operationId)}
+                  className={!creating && selectedLayer?.layerId === l.layerId ? 'pick layer active' : 'pick layer'}
+                  onClick={() => selectLayer(l.layerId)}
                 >
-                  <span>
-                    <small className="muted">{o.sortOrder}.</small> {o.name}
-                  </span>
-                  <small className="muted">{o.stages.length}개</small>
+                  <span>📁 {layerLabel(l)}</span>
+                  <small className="muted">작전 {l.operationCount}</small>
                 </button>
+                <ul className="pick-list">
+                  {opsOf(l.layerId).map((o) => (
+                    <li key={o.operationId}>
+                      <button
+                        type="button"
+                        className={shownOp?.operationId === o.operationId ? 'pick op active' : 'pick op'}
+                        onClick={() => selectOp(o.operationId)}
+                      >
+                        <span>
+                          <small className="muted">{o.sortOrder}.</small> {o.name}
+                        </span>
+                        <small className="muted">{o.stages.length}개</small>
+                      </button>
+                    </li>
+                  ))}
+                  <li>
+                    <button type="button" className="pick op add" onClick={() => setCreating({ kind: 'op', layerId: l.layerId })}>
+                      + 이 레이어에 작전 추가
+                    </button>
+                  </li>
+                </ul>
               </li>
             ))}
           </ul>
         </aside>
 
         <div className="detail-pane">
-          {creating ? (
-            <OperationForm
-              key="new"
-              operation={null}
-              defaultSortOrder={nextSortOrder}
+          {creating?.kind === 'layer' ? (
+            <LayerForm
+              key="new-layer"
+              layer={null}
+              defaultSortOrder={nextLayerOrder}
               onSaved={async (id) => {
                 await reload()
-                select(id)
+                selectLayer(id)
               }}
-              onCancel={() => setCreating(false)}
+              onCancel={() => setCreating(null)}
             />
-          ) : selected ? (
+          ) : creating?.kind === 'op' ? (
+            <OperationForm
+              key={`new-op-${creating.layerId}`}
+              operation={null}
+              layers={layers ?? []}
+              defaultLayerId={creating.layerId}
+              defaultSortOrder={nextOpOrder(creating.layerId)}
+              onSaved={async (id) => {
+                await reload()
+                selectOp(id)
+              }}
+              onCancel={() => setCreating(null)}
+            />
+          ) : selectedLayer ? (
             <>
-              <OperationForm
-                key={selected.operationId}
-                operation={selected}
-                defaultSortOrder={selected.sortOrder}
+              <LayerForm
+                key={selectedLayer.layerId}
+                layer={selectedLayer}
+                defaultSortOrder={selectedLayer.sortOrder}
                 onSaved={reload}
                 onDeleted={async () => {
                   setParams({})
                   await reload()
                 }}
               />
-              <StageList operation={selected} onChanged={reload} />
+              <div className="card">
+                <div className="row title-row">
+                  <h3 className="card-title">이 레이어의 작전 ({opsOf(selectedLayer.layerId).length})</h3>
+                  <button type="button" className="small-btn" onClick={() => setCreating({ kind: 'op', layerId: selectedLayer.layerId })}>
+                    작전 추가
+                  </button>
+                </div>
+                {opsOf(selectedLayer.layerId).length === 0 ? (
+                  <p className="muted small">작전이 없습니다.</p>
+                ) : (
+                  <ul className="plain-list">
+                    {opsOf(selectedLayer.layerId).map((o) => (
+                      <li key={o.operationId}>
+                        <button type="button" className="link-btn" onClick={() => selectOp(o.operationId)}>
+                          {o.sortOrder}. {o.name}
+                        </button>{' '}
+                        <small className="muted">스테이지 {o.stages.length}개</small>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </>
+          ) : shownOp ? (
+            <>
+              <OperationForm
+                key={shownOp.operationId}
+                operation={shownOp}
+                layers={layers ?? []}
+                defaultLayerId={shownOp.layerId}
+                defaultSortOrder={shownOp.sortOrder}
+                onSaved={reload}
+                onDeleted={async () => {
+                  setParams({})
+                  await reload()
+                }}
+              />
+              <StageList operation={shownOp} onChanged={reload} />
             </>
           ) : (
-            ops && <p className="muted">왼쪽에서 작전을 고르거나 새로 만드세요.</p>
+            ops && <p className="muted">왼쪽에서 레이어나 작전을 고르거나 새로 만드세요.</p>
           )}
         </div>
       </div>
@@ -121,21 +225,21 @@ export default function OperationsPage() {
   )
 }
 
-function OperationForm({
-  operation,
+function LayerForm({
+  layer,
   defaultSortOrder,
   onSaved,
   onDeleted,
   onCancel,
 }: {
-  operation: AdminOperationTree | null
+  layer: AdminLayer | null
   defaultSortOrder: number
-  onSaved: (operationId: number) => Promise<void> | void
+  onSaved: (layerId: number) => Promise<void> | void
   onDeleted?: () => Promise<void>
   onCancel?: () => void
 }) {
-  const [name, setName] = useState(operation?.name ?? '')
-  const [description, setDescription] = useState(operation?.description ?? '')
+  const [name, setName] = useState(layer?.name ?? '')
+  const [description, setDescription] = useState(layer?.description ?? '')
   const [sortOrder, setSortOrder] = useState(String(defaultSortOrder))
   const [error, setError] = useState('')
   const [saved, setSaved] = useState('')
@@ -149,7 +253,113 @@ function OperationForm({
     const order = Number(sortOrder)
     if (n.length < 1 || n.length > NAME_MAX) return setError(`이름은 1~${NAME_MAX}자여야 합니다.`)
     if (!Number.isInteger(order) || order < 0) return setError('순서는 0 이상 정수여야 합니다.')
+    if (layer && order !== layer.sortOrder && !window.confirm('레이어 순서를 바꾸면 해금 순서도 바뀝니다. 바꿀까요?')) return
     const req = { name: n, description: description.trim() || null, sortOrder: order }
+    setBusy(true)
+    try {
+      const res = layer ? await updateLayer(layer.layerId, req) : await createLayer(req)
+      setSaved(layer ? '저장했습니다.' : '')
+      await onSaved(res.layerId)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove() {
+    if (!layer || !onDeleted) return
+    if (layer.operationCount > 0) {
+      setError(`작전이 ${layer.operationCount}개 남아 있어 삭제할 수 없습니다. 작전을 다른 레이어로 옮기거나 지우세요.`)
+      return
+    }
+    if (!window.confirm(`레이어 '${layer.name}'을(를) 삭제할까요?`)) return
+    setBusy(true)
+    try {
+      await deleteLayer(layer.layerId)
+      await onDeleted()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="card form compact" onSubmit={submit}>
+      <div className="row title-row">
+        <h3 className="card-title">{layer ? `📁 레이어 #${layer.layerId}` : '새 레이어'}</h3>
+        {layer ? (
+          <button type="button" className="danger small-btn" disabled={busy} onClick={() => void remove()}>
+            레이어 삭제
+          </button>
+        ) : (
+          <button type="button" className="secondary small-btn" onClick={onCancel}>
+            취소
+          </button>
+        )}
+      </div>
+      <div className="grid3">
+        <label className="span2">
+          이름 ({name.trim().length}/{NAME_MAX})
+          <input value={name} maxLength={NAME_MAX} onChange={(e) => setName(e.target.value)} required />
+        </label>
+        <label>
+          순서 (0 = 튜토리얼)
+          <input type="number" min={0} step={1} value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
+        </label>
+      </div>
+      <label>
+        설명 ({description.trim().length}/{DESC_MAX}, 선택. 게임 트리에 함께 보입니다)
+        <input value={description} maxLength={DESC_MAX} onChange={(e) => setDescription(e.target.value)} />
+      </label>
+      {error && <p className="error">{error}</p>}
+      {saved && <p className="success">{saved}</p>}
+      <div className="actions">
+        <button type="submit" disabled={busy}>
+          {busy ? '저장 중...' : layer ? '저장' : '등록'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function OperationForm({
+  operation,
+  layers,
+  defaultLayerId,
+  defaultSortOrder,
+  onSaved,
+  onDeleted,
+  onCancel,
+}: {
+  operation: AdminOperationTree | null
+  layers: AdminLayer[]
+  defaultLayerId: number
+  defaultSortOrder: number
+  onSaved: (operationId: number) => Promise<void> | void
+  onDeleted?: () => Promise<void>
+  onCancel?: () => void
+}) {
+  const [name, setName] = useState(operation?.name ?? '')
+  const [description, setDescription] = useState(operation?.description ?? '')
+  const [sortOrder, setSortOrder] = useState(String(defaultSortOrder))
+  const [layerId, setLayerId] = useState(String(defaultLayerId))
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setError('')
+    setSaved('')
+    const n = name.trim()
+    const order = Number(sortOrder)
+    if (n.length < 1 || n.length > NAME_MAX) return setError(`이름은 1~${NAME_MAX}자여야 합니다.`)
+    if (!Number.isInteger(order) || order < 0) return setError('순서는 0 이상 정수여야 합니다.')
+    const layer = Number(layerId)
+    if (!layers.some((l) => l.layerId === layer)) return setError('레이어를 고르세요.')
+    if (operation && layer !== operation.layerId && !window.confirm('다른 레이어로 옮기면 해금 순서도 바뀝니다. 옮길까요?')) return
+    const req = { name: n, description: description.trim() || null, sortOrder: order, layerId: layer }
     setBusy(true)
     try {
       const res = operation ? await updateOperation(operation.operationId, req) : await createOperation(req)
@@ -182,7 +392,7 @@ function OperationForm({
   return (
     <form className="card form compact" onSubmit={submit}>
       <div className="row title-row">
-        <h3 className="card-title">{operation ? `작전 #${operation.operationId}` : '새 작전'}</h3>
+        <h3 className="card-title">{operation ? `📄 작전 #${operation.operationId}` : '새 작전'}</h3>
         {operation ? (
           <button type="button" className="danger small-btn" disabled={busy} onClick={() => void remove()}>
             작전 삭제
@@ -199,10 +409,20 @@ function OperationForm({
           <input value={name} maxLength={NAME_MAX} onChange={(e) => setName(e.target.value)} required />
         </label>
         <label>
-          순서 (0 = 튜토리얼)
+          레이어 안 순서 (튜토리얼 = 0)
           <input type="number" min={0} step={1} value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
         </label>
       </div>
+      <label>
+        레이어
+        <select value={layerId} onChange={(e) => setLayerId(e.target.value)}>
+          {layers.map((l) => (
+            <option key={l.layerId} value={l.layerId}>
+              {layerLabel(l)}
+            </option>
+          ))}
+        </select>
+      </label>
       <label>
         설명 ({description.trim().length}/{DESC_MAX}, 선택)
         <input value={description} maxLength={DESC_MAX} onChange={(e) => setDescription(e.target.value)} />

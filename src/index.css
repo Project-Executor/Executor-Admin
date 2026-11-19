@@ -990,3 +990,44 @@ button.tool.active {
   flex-direction: column;
   gap: 8px;
 }
+
+/* 레이어·작전 트리 */
+.pick-list.tree > li > .pick-list {
+  margin: 2px 0 8px 14px;
+  padding-left: 8px;
+  border-left: 1px dashed var(--line);
+}
+
+button.pick.layer {
+  font-weight: 700;
+}
+
+button.pick.op {
+  font-size: 14px;
+}
+
+button.pick.op.add {
+  color: var(--muted);
+  font-size: 13px;
+  justify-content: flex-start;
+}
+
+.plain-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+button.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+button.link-btn:hover {
+  text-decoration: underline;
+}
