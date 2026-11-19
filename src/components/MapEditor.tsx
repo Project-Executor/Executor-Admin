@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   autoCameraSize,
   cameraSize,
@@ -7,22 +7,20 @@ import {
   revealRadius,
   setCameraSize,
   setRevealRadius,
-  maxUnstable,
   nextCheckpointOrder,
   nextId,
   OBJECT_INFO,
   OBJECT_TYPES,
   objectAt,
   resize,
-  setMaxUnstable,
-  setStarBonus,
-  starBonus,
   validate,
   MAX_SIZE,
   MIN_SIZE,
 } from './mapData'
 import type { GridMap, MapObject, MapObjectType } from './mapData'
 import { solveMap, TURN_SLACK } from './mapSolver'
+import { DEFAULT_STAR1_TEXT, defaultStarText, readStars, STAR_TYPES, writeStars } from './stars'
+import type { StarCond, StarSettings, StarType } from './stars'
 import { fetchWordLists } from '../api/admin'
 import { ApiError } from '../api/client'
 import type { AdminWordList } from '../api/types'
@@ -49,12 +47,15 @@ export default function MapEditor({
   onChange,
   parMoves,
   onParMoves,
+  tutorial = false,
 }: {
   map: GridMap
   onChange: (next: GridMap) => void
   /** 스테이지 기준 턴 (시작 구간의 턴). 최소 턴 계산의 비교와 추천 적용에 쓴다 */
   parMoves?: number | null
   onParMoves?: (value: number) => void
+  /** 튜토리얼 스테이지면 게임에서 ★1만 (별 설정은 저장되지만 쓰이지 않는다) */
+  tutorial?: boolean
 }) {
   const [tool, setTool] = useState<Tool>('wall')
   const [painting, setPainting] = useState(false)
@@ -62,10 +63,75 @@ export default function MapEditor({
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
   const [sizeW, setSizeW] = useState(String(map.width))
   const [sizeH, setSizeH] = useState(String(map.height))
+  // 칸 크기 (확대·축소). 처음에는 맵 크기에 맞춘다
+  const [cell, setCell] = useState(map.width > 24 || map.height > 18 ? 22 : 30)
+  const [showFrames, setShowFrames] = useState(false)
+
+  // ---------- 되돌리기·다시 하기 ----------
+  // 칠하기 한 번(누르고 끌다 뗄 때까지)은 한 단계, 속성 입력은 0.6초 안에 이어 친 것을 한 단계로 묶는다
+  const [history, setHistory] = useState<{ past: GridMap[]; future: GridMap[] }>({ past: [], future: [] })
+  const lastPush = useRef(0)
+  const stroke = useRef<'new' | 'open' | null>(null)
+
+  function change(next: GridMap) {
+    if (next === map) return
+    const now = performance.now()
+    const push = stroke.current === 'new' || (stroke.current === null && now - lastPush.current > 600)
+    if (push) {
+      lastPush.current = now
+      if (stroke.current === 'new') stroke.current = 'open'
+    }
+    setHistory((h) => ({ past: push ? [...h.past.slice(-199), map] : h.past, future: [] }))
+    onChange(next)
+  }
+
+  function undo() {
+    const prev = history.past[history.past.length - 1]
+    if (!prev) return
+    setHistory((h) => ({ past: h.past.slice(0, -1), future: [...h.future, map] }))
+    lastPush.current = 0
+    onChange(prev)
+  }
+
+  function redo() {
+    const next = history.future[history.future.length - 1]
+    if (!next) return
+    setHistory((h) => ({ past: [...h.past, map], future: h.future.slice(0, -1) }))
+    lastPush.current = 0
+    onChange(next)
+  }
+
+  // Ctrl+Z 되돌리기, Ctrl+Shift+Z / Ctrl+Y 다시 하기 (입력칸에 쓰는 중에는 그 칸의 되돌리기를 쓴다)
+  const undoRef = useRef(undo)
+  const redoRef = useRef(redo)
+  useEffect(() => {
+    undoRef.current = undo
+    redoRef.current = redo
+  })
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return
+      if (!(e.ctrlKey || e.metaKey)) return
+      const k = e.key.toLowerCase()
+      if (k === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        undoRef.current()
+      } else if ((k === 'z' && e.shiftKey) || k === 'y') {
+        e.preventDefault()
+        redoRef.current()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // 마우스를 격자 밖에서 떼도 칠하기를 멈춘다
   useEffect(() => {
-    const stop = () => setPainting(false)
+    const stop = () => {
+      setPainting(false)
+      stroke.current = null
+    }
     window.addEventListener('mouseup', stop)
     return () => window.removeEventListener('mouseup', stop)
   }, [])
@@ -91,7 +157,7 @@ export default function MapEditor({
         objects: next.objects.map((o) => (o.type === 'checkpoint' && o.order === r.from ? { ...o, turns: r.recommended } : o)),
       }
     }
-    onChange(next)
+    change(next)
     setSolved({ map: next, results: solveMap(next, results[0]?.recommended ?? parMoves ?? null) })
   }
 
@@ -110,16 +176,16 @@ export default function MapEditor({
         if (map.tiles[y][x] === t && !(t === '#' && at)) return
         const tiles = map.tiles.map((row, ry) => (ry === y ? row.map((c, rx) => (rx === x ? t : c)) : row))
         const objects = t === '#' ? map.objects.filter((o) => o !== at) : map.objects
-        onChange({ ...map, tiles, objects })
+        change({ ...map, tiles, objects })
         return
       }
       case 'player': {
         if (dragging) return
-        onChange({ ...map, tiles: floorAt(map, x, y), player: { x, y }, objects: map.objects.filter((o) => o !== at) })
+        change({ ...map, tiles: floorAt(map, x, y), player: { x, y }, objects: map.objects.filter((o) => o !== at) })
         return
       }
       case 'erase':
-        if (at) onChange({ ...map, objects: map.objects.filter((o) => o !== at) })
+        if (at) change({ ...map, objects: map.objects.filter((o) => o !== at) })
         return
       default: {
         if (dragging && at?.type === tool) return
@@ -130,7 +196,7 @@ export default function MapEditor({
         if (tool === 'checkpoint') obj.order = at?.type === 'checkpoint' ? at.order : nextCheckpointOrder(map)
         // 출구는 하나뿐이라 새로 놓으면 옮긴다
         const others = map.objects.filter((o) => o !== at && !(tool === 'exit' && o.type === 'exit'))
-        onChange({ ...map, tiles: floorAt(map, x, y), objects: [...others, obj] })
+        change({ ...map, tiles: floorAt(map, x, y), objects: [...others, obj] })
         if (!dragging) setSelectedId(id)
       }
     }
@@ -140,7 +206,7 @@ export default function MapEditor({
     if (!selected) return
     const next = { ...selected, ...patch }
     for (const [k, v] of Object.entries(patch)) if (v === undefined) delete next[k]
-    onChange({ ...map, objects: map.objects.map((o) => (o === selected ? next : o)) })
+    change({ ...map, objects: map.objects.map((o) => (o === selected ? next : o)) })
     if (typeof patch.id === 'string') setSelectedId(patch.id)
   }
 
@@ -151,13 +217,75 @@ export default function MapEditor({
     const next = resize(map, w, h)
     setSizeW(String(next.width))
     setSizeH(String(next.height))
-    onChange(next)
+    change(next)
   }
 
-  const cell = map.width > 24 || map.height > 18 ? 22 : 30
+  // 최소 턴 계산이 맵 전체를 풀었으면 최소 기록 (별 조건 '기록 n턴 이하'의 참고값)
+  const minRecord =
+    solved && solved.map === map && solved.results.length > 0 && solved.results.every((r) => r.minTurns != null)
+      ? solved.results.reduce((sum, r) => sum + (r.minTurns ?? 0), 0)
+      : null
+
+  // 화면 범위 표시: 시작 위치와 체크포인트에서 카메라가 보여 주는 칸 (camera 설정, 없으면 자동 크기)
+  const view = { ...autoCameraSize(map), ...Object.fromEntries(Object.entries(cameraSize(map)).filter(([, v]) => v !== undefined)) } as {
+    width: number
+    height: number
+  }
+  const frames = showFrames
+    ? [
+        { label: '시작', x: map.player.x, y: map.player.y },
+        ...map.objects
+          .filter((o) => o.type === 'checkpoint')
+          .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0))
+          .map((o) => ({ label: `체크포인트 ${String(o.order ?? '?')}`, x: o.x, y: o.y })),
+      ].map((f) => {
+        const w = Math.min(map.width, view.width)
+        const h = Math.min(map.height, view.height)
+        const x0 = Math.max(0, Math.min(map.width - w, f.x - Math.floor(w / 2)))
+        const y0 = Math.max(0, Math.min(map.height - h, f.y - Math.floor(h / 2)))
+        return { ...f, x0, y0, w, h }
+      })
+    : []
+  const pitch = cell + 1 // 칸 + 1px 간격
+
+  const hoverObj = hover ? objectAt(map, hover.x, hover.y) : undefined
+  const hoverText = hover
+    ? `칸 (${hover.x}, ${hover.y}) · ${map.tiles[hover.y][hover.x] === '#' ? '벽' : '바닥'}` +
+      (map.player.x === hover.x && map.player.y === hover.y ? ' · 시작 위치' : '') +
+      (hoverObj ? ` · ${describe(hoverObj)}` : '')
+    : '칸에 마우스를 올리면 좌표와 내용이 보입니다'
 
   return (
     <div className="map-editor">
+      <StarPanel map={map} onChange={change} tutorial={tutorial} minRecord={minRecord} />
+
+      <div className="editor-bar">
+        <div className="row nowrap-row">
+          <button type="button" className="secondary small-btn" onClick={undo} disabled={history.past.length === 0} title="Ctrl+Z">
+            ↶ 되돌리기
+          </button>
+          <button type="button" className="secondary small-btn" onClick={redo} disabled={history.future.length === 0} title="Ctrl+Shift+Z 또는 Ctrl+Y">
+            ↷ 다시 하기
+          </button>
+          <span className="muted small">
+            되돌릴 수 있는 단계 {history.past.length} · Ctrl+Z / Ctrl+Y
+          </span>
+        </div>
+        <div className="row nowrap-row">
+          <span className="muted small">칸 크기</span>
+          <button type="button" className="secondary small-btn" onClick={() => setCell((c) => Math.max(12, c - 4))} aria-label="축소">
+            −
+          </button>
+          <span className="small">{cell}px</span>
+          <button type="button" className="secondary small-btn" onClick={() => setCell((c) => Math.min(48, c + 4))} aria-label="확대">
+            ＋
+          </button>
+          <label className="inline-check small">
+            <input type="checkbox" checked={showFrames} onChange={(e) => setShowFrames(e.target.checked)} /> 화면 범위 보기 ({view.width} × {view.height})
+          </label>
+        </div>
+      </div>
+
       <div className="palette">
         {TERRAIN_TOOLS.map((t) => (
           <button key={t.tool} type="button" className={tool === t.tool ? 'tool active' : 'tool'} onClick={() => setTool(t.tool)}>
@@ -173,7 +301,7 @@ export default function MapEditor({
       </div>
 
       <div className="map-work">
-        <div>
+        <div className="map-grid-wrap">
           <div
             className="map-grid"
             style={{ gridTemplateColumns: `repeat(${map.width}, ${cell}px)`, gridAutoRows: `${cell}px` }}
@@ -195,6 +323,7 @@ export default function MapEditor({
                     title={`(${x}, ${y})${o ? ` ${o.id}` : ''}${isPlayer ? ' 시작 위치' : ''}`}
                     onMouseDown={(e) => {
                       e.preventDefault()
+                      stroke.current = 'new' // 이번 칠하기 전체를 되돌리기 한 단계로
                       setPainting(true)
                       apply(x, y, false)
                     }}
@@ -209,9 +338,21 @@ export default function MapEditor({
               }),
             )}
           </div>
+          {frames.map((f) => (
+            <div
+              key={f.label}
+              className="cam-frame"
+              style={{ left: 1 + f.x0 * pitch, top: 1 + f.y0 * pitch, width: f.w * pitch - 1, height: f.h * pitch - 1 }}
+            >
+              <span>{f.label}</span>
+            </div>
+          ))}
           <p className="muted small map-status">
-            {map.width} × {map.height} · 오브젝트 {map.objects.length}개{hover ? ` · 칸 (${hover.x}, ${hover.y})` : ''}
+            {map.width} × {map.height} · 오브젝트 {map.objects.length}개 · {hoverText}
           </p>
+          {showFrames && (
+            <p className="muted small">점선: 그 지점에 있을 때 화면에 보이는 범위 (게임은 화면 비율에 맞춰 조금 더 넓게 보일 수 있습니다)</p>
+          )}
         </div>
 
         <div className="map-side">
@@ -225,41 +366,26 @@ export default function MapEditor({
                 적용
               </button>
             </div>
-            <button type="button" className="secondary small-btn" onClick={() => onChange(fillBorder(map))}>
+            <button type="button" className="secondary small-btn" onClick={() => change(fillBorder(map))}>
               테두리 벽 채우기
             </button>
           </div>
 
-          <CameraBox map={map} onChange={onChange} />
+          <CameraBox map={map} onChange={change} />
 
           <div className="map-box">
-            <b className="small">별 2 조건</b>
-            <label>
-              허용하는 불안정 체크포인트 수 (stars.maxUnstable, 출구 포함)
-              <input
-                type="number"
-                min={0}
-                step={1}
-                value={String(maxUnstable(map))}
-                onChange={(e) => {
-                  const n = Number(e.target.value)
-                  if (Number.isInteger(n) && n >= 0) onChange(setMaxUnstable(map, n))
-                }}
-              />
-            </label>
+            <b className="small">구간</b>
             <p className="muted small">
               체크포인트 {map.objects.filter((o) => o.type === 'checkpoint').length}개 · 구간 {map.objects.filter((o) => o.type === 'checkpoint').length + 1}개. 첫 구간의 턴은 스테이지
-              기준 턴입니다.
+              기준 턴입니다. 별 조건은 맨 위 ‘별 조건’에서 정합니다.
             </p>
           </div>
-
-          <StarBonusBox map={map} onChange={onChange} />
 
           <div className="map-box">
             <b className="small">선택한 오브젝트</b>
             {selected ? (
               <ObjectFields key={selected.id} obj={selected} objects={map.objects} onChange={updateSelected} onDelete={() => {
-                onChange({ ...map, objects: map.objects.filter((o) => o !== selected) })
+                change({ ...map, objects: map.objects.filter((o) => o !== selected) })
                 setSelectedId(null)
               }} />
             ) : (
@@ -270,7 +396,7 @@ export default function MapEditor({
           <div className="map-box">
             <b className="small">최소 턴 계산</b>
             <p className="muted small">
-              구간마다 가장 짧은 풀이를 찾습니다. 추천 턴 = 최소 × {TURN_SLACK} (올림). 숨겨진 요소 수집은 넣지 않습니다.
+              구간마다 가장 짧은 풀이를 찾습니다. 추천 턴 = 최소 × {TURN_SLACK} (올림). 데이터 파편 수집은 넣지 않습니다.
             </p>
             <button type="button" className="secondary small-btn" onClick={solve}>
               계산
@@ -582,43 +708,142 @@ function ComputerFields({ obj, objects, onChange }: { obj: MapObject; objects: M
   )
 }
 
-/** 별 3 조건 고르기: 숨겨진 요소 모두 찾기(기본) / 감염된 컴퓨터를 n초 안에 복구 (docs/map-data.md 3.4) */
-function StarBonusBox({ map, onChange }: { map: GridMap; onChange: (map: GridMap) => void }) {
-  const bonus = starBonus(map)
-  const hiddenCount = map.objects.filter((o) => o.type === 'hidden').length
-  const computers = map.objects.filter((o) => o.type === 'computer')
-  const target = computers.find((c) => c.id === bonus.target)
-  const limit = target && Number.isInteger(target.timeLimit) ? (target.timeLimit as number) : 30
+/** 마우스를 올린 오브젝트 한 줄 설명 */
+function describe(o: MapObject): string {
+  const label = OBJECT_INFO[o.type as MapObjectType]?.label ?? o.type
+  const extra: string[] = []
+  if (typeof o.name === 'string' && o.name) extra.push(o.name)
+  if (o.keyId !== undefined) extra.push(`keyId ${String(o.keyId)}`)
+  if (o.type === 'checkpoint') extra.push(`${String(o.order ?? '?')}번 · ${String(o.turns ?? '?')}턴`)
+  if (o.type === 'breakable') extra.push(`hp ${String(o.hp ?? 1)}`)
+  if (o.dialogueId !== undefined) extra.push(`대화 ${String(o.dialogueId)}`)
+  if (o.guidebookId !== undefined) extra.push(`도감 #${String(o.guidebookId)}`)
+  if (o.type === 'computer') extra.push(`단어 ${String(o.wordCount ?? 5)}개 · ${String(o.timeLimit ?? 30)}초`)
+  return `${label} ${o.id}${extra.length ? ` (${extra.join(', ')})` : ''}`
+}
+
+/**
+ * 별 조건 (map_data.stars, docs/map-data.md 3.4). 맵 에디터 맨 위.
+ * 별 수(1~3)와 ★2·★3 조건 종류·값, 각 별의 문구(비우면 기본 문구)를 정한다
+ */
+function StarPanel({
+  map,
+  onChange,
+  tutorial,
+  minRecord,
+}: {
+  map: GridMap
+  onChange: (map: GridMap) => void
+  tutorial: boolean
+  minRecord: number | null
+}) {
+  const s = readStars(map)
+  const set = (patch: Partial<StarSettings>) => onChange(writeStars(map, { ...s, ...patch }))
   return (
-    <div className="map-box">
-      <b className="small">별 3 조건</b>
+    <div className="card star-panel">
+      <div className="row title-row">
+        <b>별 조건</b>
+        <div className="row nowrap-row">
+          <span className="muted small">별 수</span>
+          {([1, 2, 3] as const).map((n) => (
+            <button key={n} type="button" className={s.count === n ? 'small-btn' : 'secondary small-btn'} onClick={() => set({ count: n })}>
+              {'★'.repeat(n)}
+            </button>
+          ))}
+        </div>
+      </div>
+      {tutorial && <p className="muted small">튜토리얼 스테이지는 게임에서 ★1만 받습니다. 아래 설정은 저장되지만 쓰이지 않습니다.</p>}
+      <div className="star-grid">
+        <div className="star-card">
+          <b className="small">★1 · 클리어</b>
+          <p className="muted small">출구에 도착하면 받습니다 (바꿀 수 없음)</p>
+          <label>
+            문구
+            <input value={s.star1Text ?? ''} placeholder={DEFAULT_STAR1_TEXT} maxLength={60} onChange={(e) => set({ star1Text: e.target.value })} />
+          </label>
+          <p className="star-preview">게임에서: ★1 {s.star1Text?.trim() || DEFAULT_STAR1_TEXT}</p>
+        </div>
+        <StarCard n={2} cond={s.star2} off={s.count < 2} map={map} minRecord={minRecord} onChange={(c) => set({ star2: c })} />
+        <StarCard n={3} cond={s.star3} off={s.count < 3} map={map} minRecord={minRecord} onChange={(c) => set({ star3: c })} />
+      </div>
+    </div>
+  )
+}
+
+function StarCard({
+  n,
+  cond,
+  off,
+  map,
+  minRecord,
+  onChange,
+}: {
+  n: 2 | 3
+  cond: StarCond
+  off: boolean
+  map: GridMap
+  minRecord: number | null
+  onChange: (c: StarCond) => void
+}) {
+  const spec = STAR_TYPES.find((t) => t.type === cond.type)
+  const computers = map.objects.filter((o) => o.type === 'computer')
+  const intOrUndefined = (v: string) => (v.trim() === '' ? undefined : Number(v))
+  const preview = cond.text?.trim() || defaultStarText(cond, map.objects)
+  const counts: Partial<Record<StarType, string>> = {
+    fragments: `맵의 데이터 파편 ${map.objects.filter((o) => o.type === 'hidden').length}개`,
+    anomalies: `맵의 이상 개체 ${map.objects.filter((o) => o.type === 'anomaly').length}개`,
+  }
+  return (
+    <div className={off ? 'star-card off' : 'star-card'}>
+      <b className="small">★{n}{off ? ' · 쓰지 않음 (별 수를 늘리면 쓰입니다)' : ''}</b>
       <label>
-        조건 (stars.bonus)
+        조건
         <select
-          value={bonus.type}
-          onChange={(e) =>
-            onChange(
-              e.target.value === 'hack'
-                ? setStarBonus(map, { type: 'hack', target: computers[0]?.id, seconds: 15 })
-                : setStarBonus(map, { type: 'hidden' }),
-            )
-          }
+          value={cond.type}
+          disabled={off}
+          onChange={(e) => {
+            const type = e.target.value as StarType
+            onChange({
+              type,
+              text: cond.text,
+              value: type === 'stable' || type === 'rewinds' ? 0 : type === 'moves' ? (minRecord ?? 20) : undefined,
+              target: type === 'hack' ? (cond.target ?? computers[0]?.id) : undefined,
+              seconds: type === 'hack' ? (cond.seconds ?? 15) : undefined,
+            })
+          }}
         >
-          <option value="hidden">숨겨진 요소 모두 찾기</option>
-          <option value="hack">감염된 컴퓨터를 시간 안에 복구</option>
+          {STAR_TYPES.map((t) => (
+            <option key={t.type} value={t.type}>
+              {t.label}
+            </option>
+          ))}
         </select>
       </label>
-      {bonus.type === 'hidden' ? (
+      {spec?.value && (
+        <label>
+          {spec.value.label}
+          <input
+            type="number"
+            min={spec.value.min}
+            disabled={off}
+            value={cond.value === undefined ? '' : String(cond.value)}
+            placeholder={spec.value.placeholder}
+            onChange={(e) => onChange({ ...cond, value: intOrUndefined(e.target.value) })}
+          />
+        </label>
+      )}
+      {cond.type === 'moves' && (
         <p className="muted small">
-          숨겨진 요소 {hiddenCount}개를 모두 모으면 ★3{hiddenCount === 0 ? ' (지금은 숨겨진 요소가 없어 ★3을 얻을 수 없음)' : ''}
+          {minRecord != null ? `최소 기록 ${minRecord}턴 (오른쪽 최소 턴 계산)` : '오른쪽 ‘최소 턴 계산’을 누르면 최소 기록을 알려 줍니다'}
         </p>
-      ) : (
+      )}
+      {cond.type === 'hack' && (
         <>
           <label>
-            컴퓨터 (target)
-            <select value={bonus.target ?? ''} onChange={(e) => onChange(setStarBonus(map, { ...bonus, target: e.target.value }))}>
+            컴퓨터
+            <select disabled={off} value={cond.target ?? ''} onChange={(e) => onChange({ ...cond, target: e.target.value })}>
               <option value="">고르기</option>
-              {bonus.target && !target && <option value={bonus.target}>{bonus.target} (없음)</option>}
+              {cond.target && !computers.some((c) => c.id === cond.target) && <option value={cond.target}>{cond.target} (없음)</option>}
               {computers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.id}
@@ -628,27 +853,29 @@ function StarBonusBox({ map, onChange }: { map: GridMap; onChange: (map: GridMap
             </select>
           </label>
           <label>
-            목표 시간 (seconds, 초)
+            목표 시간 (초)
             <input
               type="number"
               min={1}
               max={300}
               step={0.5}
-              value={bonus.seconds === undefined ? '' : String(bonus.seconds)}
+              disabled={off}
+              value={cond.seconds === undefined ? '' : String(cond.seconds)}
               onChange={(e) => {
-                const n = Number(e.target.value)
-                if (e.target.value.trim() !== '' && Number.isFinite(n)) onChange(setStarBonus(map, { ...bonus, seconds: n }))
+                const v = Number(e.target.value)
+                if (e.target.value.trim() !== '' && Number.isFinite(v)) onChange({ ...cond, seconds: v })
               }}
             />
           </label>
-          <p className="muted small">
-            {computers.length === 0
-              ? '맵에 감염된 컴퓨터(M)가 없습니다. 먼저 놓으세요.'
-              : `그 컴퓨터를 해킹 시작부터 ${bonus.seconds ?? '?'}초 안에 복구하면 ★3 (컴퓨터 제한 시간 ${limit}초). 한 판에 한 번이라도 해내면 인정되고 워프해도 유지됩니다. 숨겨진 요소는 ★3과 상관없어집니다.`}
-          </p>
+          {computers.length === 0 && <p className="muted small">맵에 감염된 컴퓨터(M)가 없습니다.</p>}
         </>
       )}
+      {counts[cond.type] && <p className="muted small">{counts[cond.type]}</p>}
+      <label>
+        문구 (비우면 기본 문구)
+        <input value={cond.text ?? ''} maxLength={60} disabled={off} placeholder={defaultStarText(cond, map.objects)} onChange={(e) => onChange({ ...cond, text: e.target.value })} />
+      </label>
+      <p className="star-preview">게임에서: ★{n} {preview}</p>
     </div>
   )
 }
-

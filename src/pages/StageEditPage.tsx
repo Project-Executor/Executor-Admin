@@ -306,6 +306,7 @@ export default function StageEditPage() {
                 onChange={setGrid}
                 parMoves={Number.isInteger(Number(parMoves)) ? Number(parMoves) : null}
                 onParMoves={(n) => setParMoves(String(n))}
+                tutorial={stageType === 'TUTORIAL'}
               />
               <p className="muted small">
                 지형·시작 위치·오브젝트는 여기서 고칩니다. 대화(dialogues)·안내(guides)·나레이션(story)는 ‘JSON 직접 편집’에서 고치고,
