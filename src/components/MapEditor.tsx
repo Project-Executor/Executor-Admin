@@ -22,6 +22,7 @@ import {
 import type { GridMap, MapObject, MapObjectType } from './mapData'
 import { solveMap, TURN_SLACK } from './mapSolver'
 import { fetchWordLists } from '../api/admin'
+import { ApiError } from '../api/client'
 import type { AdminWordList } from '../api/types'
 import type { SegmentResult } from './mapSolver'
 
@@ -466,9 +467,6 @@ function CameraBox({ map, onChange }: { map: GridMap; onChange: (map: GridMap) =
   )
 }
 
-/** 단어 목록은 한 번만 받아 둔다 (오브젝트를 고를 때마다 다시 부르지 않게) */
-let wordListsCache: Promise<AdminWordList[]> | null = null
-
 interface ComputerEffect {
   type: 'remove' | 'giveKey'
   target?: string
@@ -479,13 +477,24 @@ interface ComputerEffect {
 function ComputerFields({ obj, objects, onChange }: { obj: MapObject; objects: MapObject[]; onChange: (patch: Record<string, unknown>) => void }) {
   const [lists, setLists] = useState<AdminWordList[] | null>(null)
   const [listError, setListError] = useState('')
+  // 컴퓨터를 고를 때마다 새로 받는다 (단어 목록 메뉴에서 방금 등록한 목록도 바로 보이게). 새로고침 버튼으로 다시 받을 수도 있다
+  const [reload, setReload] = useState(0)
   useEffect(() => {
-    wordListsCache ??= fetchWordLists()
-    wordListsCache.then(setLists).catch(() => {
-      wordListsCache = null
-      setListError('단어 목록을 불러오지 못했습니다. ID를 직접 적어 주세요.')
-    })
-  }, [])
+    let cancelled = false
+    fetchWordLists()
+      .then((l) => {
+        if (cancelled) return
+        setLists(l)
+        setListError('')
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return
+        setListError(`단어 목록을 불러오지 못했습니다 (${e instanceof ApiError ? e.message : String(e)}). ID를 직접 적어 주세요.`)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [reload])
 
   const intOrUndefined = (v: string) => (v.trim() === '' ? undefined : Number(v))
   const effects = (Array.isArray(obj.effects) ? obj.effects : []) as ComputerEffect[]
@@ -516,7 +525,17 @@ function ComputerFields({ obj, objects, onChange }: { obj: MapObject; objects: M
           <input type="number" min={1} value={listId} onChange={(e) => onChange({ wordListId: intOrUndefined(e.target.value) })} />
         )}
       </label>
-      {listError && <p className="muted small">{listError}</p>}
+      <p className="muted small">
+        {listError ||
+          (lists === null
+            ? '단어 목록을 불러오는 중...'
+            : lists.length === 0
+              ? '등록된 단어 목록이 없습니다. 왼쪽 메뉴 ‘단어 목록’에서 먼저 등록하세요.'
+              : `단어 목록 ${lists.length}개`)}{' '}
+        <button type="button" className="secondary small-btn" onClick={() => setReload((n) => n + 1)}>
+          새로고침
+        </button>
+      </p>
       <label>
         단어 수 (wordCount, 1~20)
         <input type="number" min={1} max={20} value={obj.wordCount === undefined ? '' : String(obj.wordCount)} placeholder="5" onChange={(e) => onChange({ wordCount: intOrUndefined(e.target.value) })} />
