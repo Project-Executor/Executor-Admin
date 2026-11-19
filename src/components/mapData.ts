@@ -1,5 +1,5 @@
 // map_data v1 (Executor-Server docs/map-data.md) 편집 도우미.
-// 격자 편집기는 width·height·tiles·player·objects만 다루고, 나머지 필드(dialogues, guides, story, hints 등)는 그대로 둔다.
+// 격자 편집기는 width·height·tiles·player·objects만 다루고, 나머지 필드(dialogues, guides, story 등)는 그대로 둔다.
 
 export type Tile = '#' | '.'
 
@@ -20,7 +20,7 @@ export interface GridMap {
   tiles: Tile[][]
   player: { x: number; y: number }
   objects: MapObject[]
-  /** 격자 밖 필드 (version, theme, dialogues, guides, story, hints, ...) */
+  /** 격자 밖 필드 (version, theme, dialogues, guides, story, ...) */
   rest: Record<string, unknown>
 }
 
@@ -62,7 +62,6 @@ export function newMap(width = 9, height = 7): Record<string, unknown> {
     dialogues: {},
     guides: [],
     story: { intro: [], outro: [] },
-    hints: [],
   }
 }
 

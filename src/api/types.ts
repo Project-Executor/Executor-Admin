@@ -35,7 +35,7 @@ export interface MyProfile {
 }
 
 // ---------- 아이템 (GET /admin/items) ----------
-export type ItemType = 'SKIN' | 'THEME' | 'HINT'
+export type ItemType = 'SKIN' | 'THEME'
 
 export interface AdminItem {
   itemId: number
@@ -61,7 +61,7 @@ export interface AdminMailRequest {
   /** 0~1,000,000 */
   rewardCoin: number
   rewardItemId: number | null
-  /** 아이템이 없으면 0, 스킨·테마는 1, 힌트는 1~99 */
+  /** 아이템이 없으면 0, 있으면 1 */
   rewardItemQuantity: number
   /** ISO-8601 UTC. null이면 무기한, 값이 있으면 지금보다 뒤 */
   expiresAt: string | null
@@ -98,7 +98,6 @@ export interface AdminUserDetail extends AdminUser {
   /** 공식 스테이지 */
   clearedStageCount: number
   totalStars: number
-  /** 수량 0인 힌트는 빠짐 */
   items: OwnedItem[]
 }
 
@@ -195,7 +194,6 @@ export interface ReportStatusResponse {
 export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   SKIN: '스킨',
   THEME: '테마',
-  HINT: '힌트',
 }
 
 /** POST·PUT /admin/items. PUT은 모든 값을 보낸다 */
@@ -300,7 +298,7 @@ export interface AdminOperation {
   layerId: number
 }
 
-/** GET /admin/stages/{id}. mapData에 hints가 그대로 들어 있다 */
+/** GET /admin/stages/{id} */
 export interface AdminStage {
   stageId: number
   operationId: number
@@ -308,7 +306,6 @@ export interface AdminStage {
   stageType: StageType
   title: string
   mapData: Record<string, unknown>
-  hintCount: number
   parMoves: number
   rewardCoin: number
   createdAt: string
@@ -322,7 +319,7 @@ export interface AdminStageRequest {
   stageType: StageType
   /** 1~100자 */
   title: string
-  /** JSON 객체 (문자열 아님). hints가 있으면 배열 */
+  /** JSON 객체 (문자열 아님) */
   mapData: Record<string, unknown>
   /** 1~9999 */
   parMoves: number

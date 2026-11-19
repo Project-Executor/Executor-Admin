@@ -14,8 +14,8 @@ import type { GridMap } from '../components/mapData'
 const TITLE_MAX = 100
 const TYPES = Object.keys(STAGE_TYPE_LABEL) as StageType[]
 
-/** 맵 데이터 JSON 검사. 문제가 있으면 { error }, 없으면 { value, hintCount } */
-function parseMapData(text: string): { error: string } | { value: Record<string, unknown>; hintCount: number } {
+/** 맵 데이터 JSON 검사. 문제가 있으면 { error }, 없으면 { value } */
+function parseMapData(text: string): { error: string } | { value: Record<string, unknown> } {
   let parsed: unknown
   try {
     parsed = JSON.parse(text)
@@ -25,9 +25,7 @@ function parseMapData(text: string): { error: string } | { value: Record<string,
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return { error: '맵 데이터는 { }로 감싼 JSON 객체여야 합니다.' }
   }
-  const value = parsed as Record<string, unknown>
-  if ('hints' in value && !Array.isArray(value.hints)) return { error: 'hints는 배열이어야 합니다.' }
-  return { value, hintCount: Array.isArray(value.hints) ? value.hints.length : 0 }
+  return { value: parsed as Record<string, unknown> }
 }
 
 /** 공식 스테이지 등록(/stages/new?operationId=&stageNo=)·수정(/stages/:stageId) */
@@ -100,8 +98,7 @@ export default function StageEditPage() {
   /** 지금 편집 중인 맵 데이터 */
   function currentMap(): ReturnType<typeof parseMapData> {
     if (mapMode === 'json') return parseMapData(mapText)
-    const value = toJson(grid)
-    return { value, hintCount: Array.isArray(value.hints) ? value.hints.length : 0 }
+    return { value: toJson(grid) }
   }
 
   useEffect(() => {
@@ -143,7 +140,7 @@ export default function StageEditPage() {
     }
     setError('')
     setMapText(JSON.stringify(r.value, null, 2))
-    setMapCheck(`올바른 JSON입니다. 힌트 ${r.hintCount}개`)
+    setMapCheck('올바른 JSON입니다.')
   }
 
   function buildRequest(): string | AdminStageRequest {
@@ -229,7 +226,7 @@ export default function StageEditPage() {
       </div>
       {loaded && (
         <p className="muted small">
-          등록 {formatDateTime(loaded.createdAt)} · 수정 {formatDateTime(loaded.updatedAt)} · 힌트 {loaded.hintCount}개
+          등록 {formatDateTime(loaded.createdAt)} · 수정 {formatDateTime(loaded.updatedAt)}
         </p>
       )}
 
@@ -311,7 +308,7 @@ export default function StageEditPage() {
                 onParMoves={(n) => setParMoves(String(n))}
               />
               <p className="muted small">
-                지형·시작 위치·오브젝트는 여기서 고칩니다. 대화(dialogues)·안내(guides)·나레이션(story)·힌트(hints)는 ‘JSON 직접 편집’에서 고치고,
+                지형·시작 위치·오브젝트는 여기서 고칩니다. 대화(dialogues)·안내(guides)·나레이션(story)는 ‘JSON 직접 편집’에서 고치고,
                 격자에서 고쳐도 그대로 유지됩니다.
               </p>
             </>
