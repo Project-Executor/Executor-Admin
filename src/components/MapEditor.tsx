@@ -15,6 +15,8 @@ import {
   objectAt,
   resize,
   setMaxUnstable,
+  setStarBonus,
+  starBonus,
   validate,
   MAX_SIZE,
   MIN_SIZE,
@@ -22,6 +24,7 @@ import {
 import type { GridMap, MapObject, MapObjectType } from './mapData'
 import { solveMap, TURN_SLACK } from './mapSolver'
 import { fetchWordLists } from '../api/admin'
+import { ApiError } from '../api/client'
 import type { AdminWordList } from '../api/types'
 import type { SegmentResult } from './mapSolver'
 
@@ -248,11 +251,9 @@ export default function MapEditor({
               체크포인트 {map.objects.filter((o) => o.type === 'checkpoint').length}개 · 구간 {map.objects.filter((o) => o.type === 'checkpoint').length + 1}개. 첫 구간의 턴은 스테이지
               기준 턴입니다.
             </p>
-            <p className="muted small">
-              ★3: 숨겨진 요소 {map.objects.filter((o) => o.type === 'hidden').length}개를 모두 모으기
-              {map.objects.some((o) => o.type === 'hidden') ? '' : ' (없으면 ★3을 얻을 수 없음)'}
-            </p>
           </div>
+
+          <StarBonusBox map={map} onChange={onChange} />
 
           <div className="map-box">
             <b className="small">선택한 오브젝트</b>
@@ -466,9 +467,6 @@ function CameraBox({ map, onChange }: { map: GridMap; onChange: (map: GridMap) =
   )
 }
 
-/** 단어 목록은 한 번만 받아 둔다 (오브젝트를 고를 때마다 다시 부르지 않게) */
-let wordListsCache: Promise<AdminWordList[]> | null = null
-
 interface ComputerEffect {
   type: 'remove' | 'giveKey'
   target?: string
@@ -479,13 +477,24 @@ interface ComputerEffect {
 function ComputerFields({ obj, objects, onChange }: { obj: MapObject; objects: MapObject[]; onChange: (patch: Record<string, unknown>) => void }) {
   const [lists, setLists] = useState<AdminWordList[] | null>(null)
   const [listError, setListError] = useState('')
+  // 컴퓨터를 고를 때마다 새로 받는다 (단어 목록 메뉴에서 방금 등록한 목록도 바로 보이게). 새로고침 버튼으로 다시 받을 수도 있다
+  const [reload, setReload] = useState(0)
   useEffect(() => {
-    wordListsCache ??= fetchWordLists()
-    wordListsCache.then(setLists).catch(() => {
-      wordListsCache = null
-      setListError('단어 목록을 불러오지 못했습니다. ID를 직접 적어 주세요.')
-    })
-  }, [])
+    let cancelled = false
+    fetchWordLists()
+      .then((l) => {
+        if (cancelled) return
+        setLists(l)
+        setListError('')
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return
+        setListError(`단어 목록을 불러오지 못했습니다 (${e instanceof ApiError ? e.message : String(e)}). ID를 직접 적어 주세요.`)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [reload])
 
   const intOrUndefined = (v: string) => (v.trim() === '' ? undefined : Number(v))
   const effects = (Array.isArray(obj.effects) ? obj.effects : []) as ComputerEffect[]
@@ -516,7 +525,17 @@ function ComputerFields({ obj, objects, onChange }: { obj: MapObject; objects: M
           <input type="number" min={1} value={listId} onChange={(e) => onChange({ wordListId: intOrUndefined(e.target.value) })} />
         )}
       </label>
-      {listError && <p className="muted small">{listError}</p>}
+      <p className="muted small">
+        {listError ||
+          (lists === null
+            ? '단어 목록을 불러오는 중...'
+            : lists.length === 0
+              ? '등록된 단어 목록이 없습니다. 왼쪽 메뉴 ‘단어 목록’에서 먼저 등록하세요.'
+              : `단어 목록 ${lists.length}개`)}{' '}
+        <button type="button" className="secondary small-btn" onClick={() => setReload((n) => n + 1)}>
+          새로고침
+        </button>
+      </p>
       <label>
         단어 수 (wordCount, 1~20)
         <input type="number" min={1} max={20} value={obj.wordCount === undefined ? '' : String(obj.wordCount)} placeholder="5" onChange={(e) => onChange({ wordCount: intOrUndefined(e.target.value) })} />
@@ -562,3 +581,74 @@ function ComputerFields({ obj, objects, onChange }: { obj: MapObject; objects: M
     </>
   )
 }
+
+/** 별 3 조건 고르기: 숨겨진 요소 모두 찾기(기본) / 감염된 컴퓨터를 n초 안에 복구 (docs/map-data.md 3.4) */
+function StarBonusBox({ map, onChange }: { map: GridMap; onChange: (map: GridMap) => void }) {
+  const bonus = starBonus(map)
+  const hiddenCount = map.objects.filter((o) => o.type === 'hidden').length
+  const computers = map.objects.filter((o) => o.type === 'computer')
+  const target = computers.find((c) => c.id === bonus.target)
+  const limit = target && Number.isInteger(target.timeLimit) ? (target.timeLimit as number) : 30
+  return (
+    <div className="map-box">
+      <b className="small">별 3 조건</b>
+      <label>
+        조건 (stars.bonus)
+        <select
+          value={bonus.type}
+          onChange={(e) =>
+            onChange(
+              e.target.value === 'hack'
+                ? setStarBonus(map, { type: 'hack', target: computers[0]?.id, seconds: 15 })
+                : setStarBonus(map, { type: 'hidden' }),
+            )
+          }
+        >
+          <option value="hidden">숨겨진 요소 모두 찾기</option>
+          <option value="hack">감염된 컴퓨터를 시간 안에 복구</option>
+        </select>
+      </label>
+      {bonus.type === 'hidden' ? (
+        <p className="muted small">
+          숨겨진 요소 {hiddenCount}개를 모두 모으면 ★3{hiddenCount === 0 ? ' (지금은 숨겨진 요소가 없어 ★3을 얻을 수 없음)' : ''}
+        </p>
+      ) : (
+        <>
+          <label>
+            컴퓨터 (target)
+            <select value={bonus.target ?? ''} onChange={(e) => onChange(setStarBonus(map, { ...bonus, target: e.target.value }))}>
+              <option value="">고르기</option>
+              {bonus.target && !target && <option value={bonus.target}>{bonus.target} (없음)</option>}
+              {computers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.id}
+                  {c.name ? ` · ${String(c.name)}` : ''} ({c.x}, {c.y})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            목표 시간 (seconds, 초)
+            <input
+              type="number"
+              min={1}
+              max={300}
+              step={0.5}
+              value={bonus.seconds === undefined ? '' : String(bonus.seconds)}
+              onChange={(e) => {
+                const n = Number(e.target.value)
+                if (e.target.value.trim() !== '' && Number.isFinite(n)) onChange(setStarBonus(map, { ...bonus, seconds: n }))
+              }}
+            />
+          </label>
+          <p className="muted small">
+            {computers.length === 0
+              ? '맵에 감염된 컴퓨터(M)가 없습니다. 먼저 놓으세요.'
+              : `그 컴퓨터를 해킹 시작부터 ${bonus.seconds ?? '?'}초 안에 복구하면 ★3 (컴퓨터 제한 시간 ${limit}초). 한 판에 한 번이라도 해내면 인정되고 워프해도 유지됩니다. 숨겨진 요소는 ★3과 상관없어집니다.`}
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+

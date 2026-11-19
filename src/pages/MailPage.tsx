@@ -50,8 +50,8 @@ export default function MailPage() {
   }, [])
 
   const item = useMemo(() => items.find((i) => String(i.itemId) === itemId) ?? null, [items, itemId])
-  // 스킨·테마는 1개만, 힌트는 1~99
-  const quantityFixed = item !== null && item.itemType !== 'HINT'
+  // 아이템은 1개만 첨부한다
+  const quantityFixed = item !== null
 
   function addReceivers(list: Receiver[]) {
     setReceivers((prev) => {
@@ -122,7 +122,7 @@ export default function MailPage() {
     let q = 0
     if (item) {
       q = quantityFixed ? 1 : Number(quantity)
-      if (!Number.isInteger(q) || q < 1 || q > 99) return '힌트 수량은 1~99개여야 합니다.'
+      if (q !== 1) return '아이템은 1개만 첨부할 수 있습니다.'
     }
     let expiresAt: string | null = null
     if (!noExpiry) {
@@ -308,7 +308,7 @@ export default function MailPage() {
               {itemsError && <span className="error small">아이템 목록을 불러오지 못했습니다: {itemsError}</span>}
             </label>
             <label>
-              수량 {item ? (quantityFixed ? '(스킨·테마는 1개)' : '(힌트 1~99)') : ''}
+              수량 {item ? '(1개)' : ''}
               <input
                 type="number"
                 min={1}
