@@ -233,6 +233,22 @@ export interface AdminStageSummary {
   updatedAt: string
 }
 
+/** GET /admin/word-lists 항목. 감염된 컴퓨터 타자 해킹 단어 */
+export interface AdminWordList {
+  wordListId: number
+  name: string
+  description: string | null
+  words: string[]
+}
+
+export interface AdminWordListRequest {
+  /** 1~100자, 겹치면 409 */
+  name: string
+  description: string | null
+  /** 앞뒤 공백 제거, 빈 줄·중복 제외 후 1개 이상, 하나는 50자 이하 */
+  words: string[]
+}
+
 /** GET /admin/layers 항목. 레이어(대주제) 안에 작전(소주제)이 들어간다 */
 export interface AdminLayer {
   layerId: number

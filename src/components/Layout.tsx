@@ -11,6 +11,7 @@ const MENU: { label: string; path?: string }[] = [
   { label: '레이어·작전', path: '/stages' },
   { label: '아이템', path: '/items' },
   { label: '도감', path: '/guidebooks' },
+  { label: '단어 목록', path: '/word-lists' },
 ]
 
 export default function Layout() {

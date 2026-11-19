@@ -9,6 +9,7 @@ const SHORTCUTS: { to: string; title: string; desc: string }[] = [
   { to: '/stages', title: '레이어·작전', desc: '레이어·작전·공식 스테이지와 맵 편집' },
   { to: '/items', title: '아이템', desc: '상점 아이템 등록, 판매 중단' },
   { to: '/guidebooks', title: '도감', desc: '이상 개체·용어 항목' },
+  { to: '/word-lists', title: '단어 목록', desc: '감염된 컴퓨터 타자 해킹 단어' },
 ]
 
 export default function HomePage() {

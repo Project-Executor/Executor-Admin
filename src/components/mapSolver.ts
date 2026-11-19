@@ -2,6 +2,7 @@
 // 규칙은 Unity Assets/Scripts/Game/Board.cs, Executor-Server docs/map-data.md 3장과 같다.
 // 구간(시작 → 체크포인트 1 → … → 출구)마다 너비 우선 탐색으로 최소 턴을 찾고, 그 풀이가 끝난 상태에서 다음 구간을 찾는다.
 // 대화로 열쇠를 주는 인물(giveKey)은 3x3 안에 들어가면 열쇠를 준 것으로 본다 (대화는 턴을 쓰지 않으므로 최소 턴은 같다).
+// 감염된 컴퓨터는 3x3 안에서 해킹(E) 한 번 = 1턴, 항상 성공으로 보고 effects(remove, giveKey)를 실행한다.
 import type { GridMap, MapObject } from './mapData'
 
 /** 기준 턴 추천 = 최소 턴 × 이 값 (올림). Executor-Server docs/maps/build_tutorial.py의 TURN_SLACK과 같다 */
@@ -27,7 +28,14 @@ export interface SegmentResult {
   error?: string
 }
 
+interface ComputerEffect {
+  type: string
+  target?: string
+  keyId?: string
+}
+
 interface Obj {
+  id: string
   type: string
   x: number
   y: number
@@ -37,6 +45,10 @@ interface Obj {
   removed: boolean
   /** npc: 대화로 주는 열쇠들 */
   gives: string[]
+  /** computer: 복구했는지 */
+  restored: boolean
+  /** computer: 복구하면 실행할 효과 */
+  effects: ComputerEffect[]
 }
 
 interface State {
@@ -55,7 +67,7 @@ const DIRS: [string, number, number][] = [
 ]
 
 function keyOf(s: State): string {
-  const objs = s.objs.map((o) => `${o.x},${o.y},${o.hp},${o.removed ? 1 : 0}`).join(';')
+  const objs = s.objs.map((o) => `${o.x},${o.y},${o.hp},${o.removed ? 1 : 0}${o.restored ? 'r' : ''}`).join(';')
   const keys = Object.keys(s.keys).sort().map((k) => `${k}=${s.keys[k]}`).join(',')
   return `${s.px},${s.py}|${objs}|${keys}|${[...s.given].sort().join(',')}`
 }
@@ -115,6 +127,7 @@ function step(map: GridMap, s: State, dx: number, dy: number, current: number, t
   switch (o.type) {
     case 'npc':
     case 'anomaly':
+    case 'computer':
       return null
     case 'crate': {
       const bx = tx + dx
@@ -152,6 +165,26 @@ function step(map: GridMap, s: State, dx: number, dy: number, current: number, t
   }
 }
 
+/** 3x3 안의 복구 안 된 컴퓨터를 해킹한 상태들 (1턴, 항상 성공) */
+function hacks(s: State): State[] {
+  const out: State[] = []
+  s.objs.forEach((o, i) => {
+    if (o.type !== 'computer' || o.removed || o.restored || Math.abs(o.x - s.px) > 1 || Math.abs(o.y - s.py) > 1) return
+    const n = clone(s)
+    n.objs[i].restored = true
+    for (const e of o.effects) {
+      if (e.type === 'giveKey' && e.keyId) n.keys[e.keyId] = (n.keys[e.keyId] ?? 0) + 1
+      else if (e.type === 'remove') {
+        const t = n.objs.find((p, j) => j !== i && p.id === e.target && !p.removed && p.type !== 'exit' && p.type !== 'checkpoint')
+        if (t) t.removed = true
+      }
+    }
+    talk(n)
+    out.push(n)
+  })
+  return out
+}
+
 function solveSegment(map: GridMap, start: State, current: number, target: number | 'exit'): { turns: number; moves: string; end: State } | { error: string } {
   const seen = new Set<string>([keyOf(start)])
   let frontier: { s: State; path: string }[] = [{ s: start, path: '' }]
@@ -170,6 +203,12 @@ function solveSegment(map: GridMap, start: State, current: number, target: numbe
         if (seen.size > MAX_STATES) return { error: '경우의 수가 너무 많아 계산을 멈췄습니다' }
         next.push({ s: r.next, path: path + ch })
       }
+      for (const h of hacks(s)) {
+        const k = keyOf(h)
+        if (seen.has(k)) continue
+        seen.add(k)
+        next.push({ s: h, path: path + 'E' })
+      }
     }
     frontier = next
   }
@@ -183,6 +222,7 @@ export function solveMap(map: GridMap, parMoves: number | null): SegmentResult[]
     px: map.player.x,
     py: map.player.y,
     objs: map.objects.map((o) => ({
+      id: o.id,
       type: o.type,
       x: o.x,
       y: o.y,
@@ -191,6 +231,8 @@ export function solveMap(map: GridMap, parMoves: number | null): SegmentResult[]
       order: Number.isInteger(o.order) ? (o.order as number) : undefined,
       removed: false,
       gives: o.type === 'npc' ? npcGives(o, dialogues) : [],
+      restored: false,
+      effects: o.type === 'computer' && Array.isArray(o.effects) ? (o.effects as ComputerEffect[]) : [],
     })),
     keys: {},
     given: [],

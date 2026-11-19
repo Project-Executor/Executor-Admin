@@ -889,6 +889,12 @@ button.tool.active {
   color: #fff;
 }
 
+.map-grid .cell.obj-computer,
+.swatch.obj-computer {
+  background: #c2365a;
+  color: #fff;
+}
+
 .map-grid .cell.obj-fakeWall,
 .swatch.obj-fakeWall {
   background: #39424f;

@@ -3,7 +3,7 @@
 
 export type Tile = '#' | '.'
 
-export type MapObjectType = 'exit' | 'crate' | 'breakable' | 'key' | 'door' | 'npc' | 'checkpoint' | 'hidden' | 'anomaly' | 'fakeWall'
+export type MapObjectType = 'exit' | 'crate' | 'breakable' | 'key' | 'door' | 'npc' | 'checkpoint' | 'hidden' | 'anomaly' | 'fakeWall' | 'computer'
 
 export interface MapObject {
   id: string
@@ -39,6 +39,7 @@ export const OBJECT_INFO: Record<MapObjectType, { label: string; symbol: string;
   hidden: { label: '숨겨진 요소', symbol: 'H', defaults: {} },
   anomaly: { label: '이상 개체', symbol: 'A', defaults: { name: '이상 개체' } },
   fakeWall: { label: '가짜 벽', symbol: 'F', defaults: {} },
+  computer: { label: '감염된 컴퓨터', symbol: 'M', defaults: { wordCount: 5, timeLimit: 30, effects: [] } },
 }
 
 export const OBJECT_TYPES = Object.keys(OBJECT_INFO) as MapObjectType[]
@@ -195,7 +196,7 @@ export function validate(map: GridMap): string[] {
     if (o.type === 'turnReset') issues.push(`${o.id}: 턴 리셋(turnReset)은 체크포인트(checkpoint)로 바뀌었습니다. 체크포인트로 다시 놓으세요.`)
   }
 
-  // 문을 열 열쇠: 맵의 열쇠 또는 대화의 giveKey
+  // 문을 열 열쇠: 맵의 열쇠, 대화의 giveKey, 컴퓨터의 giveKey (또는 컴퓨터가 문을 없앰)
   const dialogues = (map.rest.dialogues ?? {}) as Record<string, unknown>
   const givenKeys = new Set<string>()
   const walk = (v: unknown): void => {
@@ -207,9 +208,18 @@ export function validate(map: GridMap): string[] {
     }
   }
   walk(dialogues)
+  // 컴퓨터의 effects도 열쇠를 주거나(giveKey) 문을 없앤다(remove)
+  const removedByComputer = new Set<string>()
+  for (const c of objects.filter((o) => o.type === 'computer' && Array.isArray(o.effects))) {
+    for (const e of c.effects as Record<string, unknown>[]) {
+      if (e.type === 'giveKey') givenKeys.add(String(e.keyId))
+      if (e.type === 'remove') removedByComputer.add(String(e.target))
+    }
+  }
   const mapKeys = new Set(objects.filter((o) => o.type === 'key').map((o) => String(o.keyId)))
   for (const d of objects.filter((o) => o.type === 'door')) {
-    if (!mapKeys.has(String(d.keyId)) && !givenKeys.has(String(d.keyId))) issues.push(`${d.id}(keyId '${String(d.keyId)}')를 열 열쇠가 맵에도 대화에도 없습니다.`)
+    if (!mapKeys.has(String(d.keyId)) && !givenKeys.has(String(d.keyId)) && !removedByComputer.has(d.id))
+      issues.push(`${d.id}(keyId '${String(d.keyId)}')를 열 열쇠가 맵에도 대화에도 컴퓨터에도 없습니다.`)
   }
   for (const n of objects.filter((o) => o.type === 'npc')) {
     if (typeof n.dialogueId !== 'string' || !(n.dialogueId in dialogues)) issues.push(`${n.id}의 대화 '${String(n.dialogueId)}'가 dialogues에 없습니다. (JSON 탭에서 추가)`)
@@ -227,6 +237,25 @@ export function validate(map: GridMap): string[] {
     if (stars === null || typeof stars !== 'object' || (max !== undefined && !(Number.isInteger(max) && (max as number) >= 0))) {
       issues.push('stars.maxUnstable은 0 이상 정수여야 합니다.')
     }
+  }
+  for (const o of objects) {
+    if (o.type !== 'computer') continue
+    const at = `${o.id} ${pos(o)}`
+    if (o.wordListId !== undefined && !(Number.isInteger(o.wordListId) && (o.wordListId as number) >= 1)) issues.push(`${at}: wordListId는 1 이상 정수여야 합니다.`)
+    if (o.wordListId === undefined) issues.push(`${at}: 단어 목록(wordListId)이 없어 게임의 기본 단어를 씁니다.`)
+    if (o.wordCount !== undefined && !(Number.isInteger(o.wordCount) && (o.wordCount as number) >= 1 && (o.wordCount as number) <= 20)) issues.push(`${at}: wordCount는 1~20이어야 합니다.`)
+    if (o.timeLimit !== undefined && !(Number.isInteger(o.timeLimit) && (o.timeLimit as number) >= 5 && (o.timeLimit as number) <= 300)) issues.push(`${at}: timeLimit은 5~300초여야 합니다.`)
+    const effects = Array.isArray(o.effects) ? (o.effects as Record<string, unknown>[]) : []
+    if (o.effects !== undefined && !Array.isArray(o.effects)) issues.push(`${at}: effects는 배열이어야 합니다.`)
+    effects.forEach((e, i) => {
+      if (e.type === 'remove') {
+        const t = objects.find((p) => p.id === e.target)
+        if (!t) issues.push(`${at}: 효과 ${i + 1}의 대상 '${String(e.target)}'이(가) 없습니다.`)
+        else if (t.type === 'exit' || t.type === 'checkpoint' || t === o) issues.push(`${at}: 효과 ${i + 1}의 대상으로 출구·체크포인트·자기 자신은 쓸 수 없습니다.`)
+      } else if (e.type === 'giveKey') {
+        if (typeof e.keyId !== 'string' || !e.keyId) issues.push(`${at}: 효과 ${i + 1}(giveKey)에 keyId가 없습니다.`)
+      } else issues.push(`${at}: 효과 ${i + 1}의 type '${String(e.type)}'은(는) remove 또는 giveKey여야 합니다.`)
+    })
   }
   const cam = map.rest.camera as Record<string, unknown> | undefined
   for (const k of ['width', 'height'] as const) {
