@@ -3,7 +3,7 @@
 
 export type Tile = '#' | '.'
 
-export type MapObjectType = 'exit' | 'crate' | 'breakable' | 'key' | 'door' | 'npc' | 'checkpoint' | 'hidden' | 'anomaly'
+export type MapObjectType = 'exit' | 'crate' | 'breakable' | 'key' | 'door' | 'npc' | 'checkpoint' | 'hidden' | 'anomaly' | 'fakeWall'
 
 export interface MapObject {
   id: string
@@ -38,6 +38,7 @@ export const OBJECT_INFO: Record<MapObjectType, { label: string; symbol: string;
   checkpoint: { label: '체크포인트', symbol: 'S', defaults: { turns: 10 } },
   hidden: { label: '숨겨진 요소', symbol: 'H', defaults: {} },
   anomaly: { label: '이상 개체', symbol: 'A', defaults: { name: '이상 개체' } },
+  fakeWall: { label: '가짜 벽', symbol: 'F', defaults: {} },
 }
 
 export const OBJECT_TYPES = Object.keys(OBJECT_INFO) as MapObjectType[]

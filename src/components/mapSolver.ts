@@ -147,7 +147,8 @@ function step(map: GridMap, s: State, dx: number, dy: number, current: number, t
     case 'exit':
       return target === 'exit' ? move(true) : null
     default:
-      return move() // hidden(수집은 최소 턴에 넣지 않음), 모르는 type
+      // hidden(수집은 최소 턴에 넣지 않음), fakeWall(바닥처럼 지나감. 상자는 위 crate에서 막힘), 모르는 type
+      return move()
   }
 }
 

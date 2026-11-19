@@ -353,6 +353,9 @@ function ObjectFields({ obj, onChange, onDelete }: { obj: MapObject; onChange: (
           </label>
         </>
       )}
+      {obj.type === 'fakeWall' && (
+        <p className="muted small">게임에서는 벽과 똑같이 보입니다. 들어가면 지나갈 수 있고(1턴) 그때부터 드러납니다. 상자는 밀어 넣을 수 없습니다.</p>
+      )}
       {obj.type === 'hidden' && (
         <label>
           이름 (선택, 화면에 표시)
