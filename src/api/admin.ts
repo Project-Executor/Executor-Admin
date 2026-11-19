@@ -1,6 +1,8 @@
 // 관리자 화면에서 쓰는 API. 기능을 추가할 때 여기에 함수를 더한다.
 import { api, get, patch, post, put } from './client'
 import type {
+  AdminWordList,
+  AdminWordListRequest,
   AdminLayer,
   AdminLayerRequest,
   AdminGuidebook,
@@ -107,6 +109,18 @@ export function fetchReports(status: ReportStatus | '' = '', page = 0, size = 20
 /** 신고 상태 변경. 앞으로만 진행 (접수 -> 처리 중 -> 완료, 접수 -> 완료). 되돌리면 400 */
 export const changeReportStatus = (reportId: number, status: ReportStatus) =>
   patch<ReportStatusResponse>(`/admin/reports/${reportId}`, { status })
+
+// ---------- 단어 목록 (타자 해킹) ----------
+
+export const fetchWordLists = () => get<AdminWordList[]>('/admin/word-lists')
+
+export const createWordList = (request: AdminWordListRequest) => post<AdminWordList>('/admin/word-lists', request)
+
+export const updateWordList = (wordListId: number, request: AdminWordListRequest) =>
+  put<AdminWordList>(`/admin/word-lists/${wordListId}`, request)
+
+/** 맵이 쓰고 있어도 지운다 (게임은 기본 단어를 쓴다) */
+export const deleteWordList = (wordListId: number) => api<void>('DELETE', `/admin/word-lists/${wordListId}`)
 
 // ---------- 작전·스테이지 ----------
 

@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
 import {
+  autoCameraSize,
+  cameraSize,
+  DEFAULT_REVEAL_RADIUS,
   fillBorder,
+  revealRadius,
+  setCameraSize,
+  setRevealRadius,
   maxUnstable,
   nextCheckpointOrder,
   nextId,
@@ -15,6 +21,8 @@ import {
 } from './mapData'
 import type { GridMap, MapObject, MapObjectType } from './mapData'
 import { solveMap, TURN_SLACK } from './mapSolver'
+import { fetchWordLists } from '../api/admin'
+import type { AdminWordList } from '../api/types'
 import type { SegmentResult } from './mapSolver'
 
 /** 팔레트 도구 */
@@ -219,6 +227,8 @@ export default function MapEditor({
             </button>
           </div>
 
+          <CameraBox map={map} onChange={onChange} />
+
           <div className="map-box">
             <b className="small">별 2 조건</b>
             <label>
@@ -247,7 +257,7 @@ export default function MapEditor({
           <div className="map-box">
             <b className="small">선택한 오브젝트</b>
             {selected ? (
-              <ObjectFields key={selected.id} obj={selected} onChange={updateSelected} onDelete={() => {
+              <ObjectFields key={selected.id} obj={selected} objects={map.objects} onChange={updateSelected} onDelete={() => {
                 onChange({ ...map, objects: map.objects.filter((o) => o !== selected) })
                 setSelectedId(null)
               }} />
@@ -316,7 +326,17 @@ function floorAt(map: GridMap, x: number, y: number) {
 }
 
 /** 오브젝트 종류별 속성 입력 (docs/map-data.md 2장) */
-function ObjectFields({ obj, onChange, onDelete }: { obj: MapObject; onChange: (patch: Record<string, unknown>) => void; onDelete: () => void }) {
+function ObjectFields({
+  obj,
+  objects,
+  onChange,
+  onDelete,
+}: {
+  obj: MapObject
+  objects: MapObject[]
+  onChange: (patch: Record<string, unknown>) => void
+  onDelete: () => void
+}) {
   const [id, setId] = useState(obj.id)
   const intOrUndefined = (v: string) => (v.trim() === '' ? undefined : Number(v))
 
@@ -353,6 +373,10 @@ function ObjectFields({ obj, onChange, onDelete }: { obj: MapObject; onChange: (
           </label>
         </>
       )}
+      {obj.type === 'computer' && <ComputerFields obj={obj} objects={objects} onChange={onChange} />}
+      {obj.type === 'fakeWall' && (
+        <p className="muted small">게임에서는 벽과 똑같이 보입니다. 들어가면 지나갈 수 있고(1턴) 그때부터 드러납니다. 상자는 밀어 넣을 수 없습니다.</p>
+      )}
       {obj.type === 'hidden' && (
         <label>
           이름 (선택, 화면에 표시)
@@ -387,5 +411,154 @@ function ObjectFields({ obj, onChange, onDelete }: { obj: MapObject; onChange: (
         이 오브젝트 지우기
       </button>
     </div>
+  )
+}
+
+/** 빈 칸이면 undefined, 아니면 정수 (잘못된 값은 null) */
+function optionalInt(text: string): number | undefined | null {
+  if (text.trim() === '') return undefined
+  const n = Number(text)
+  return Number.isInteger(n) ? n : null
+}
+
+/** 화면(카메라)과 미니맵 설정: camera.width·height, minimap.revealRadius (docs/map-data.md 3.8) */
+function CameraBox({ map, onChange }: { map: GridMap; onChange: (map: GridMap) => void }) {
+  const size = cameraSize(map)
+  const auto = autoCameraSize(map)
+  const radius = revealRadius(map)
+  const setSize = (key: 'width' | 'height', text: string) => {
+    const n = optionalInt(text)
+    if (n === null || (n !== undefined && n < 1)) return
+    onChange(setCameraSize(map, { ...size, [key]: n }))
+  }
+  return (
+    <div className="map-box">
+      <b className="small">화면·미니맵</b>
+      <label>
+        화면에 보일 칸 수 (camera, 가로 × 세로)
+        <div className="row">
+          <input type="number" min={3} max={map.width} value={size.width ?? ''} placeholder={`자동 ${auto.width}`} onChange={(e) => setSize('width', e.target.value)} aria-label="화면 가로 칸 수" className="size-input" />
+          ×
+          <input type="number" min={3} max={map.height} value={size.height ?? ''} placeholder={`자동 ${auto.height}`} onChange={(e) => setSize('height', e.target.value)} aria-label="화면 세로 칸 수" className="size-input" />
+        </div>
+      </label>
+      <p className="muted small">
+        비우면 자동(지금 맵은 {auto.width} × {auto.height}). 한쪽만 적으면 그쪽에 맞추고 다른 쪽은 화면 비율대로 보입니다. 맵보다 크게 적으면 맵 크기까지만 보입니다. M 키는 맵 전체 보기입니다.
+      </p>
+      <label>
+        미니맵 밝힘 범위 (minimap.revealRadius, 플레이어 둘레 칸 수)
+        <input
+          type="number"
+          min={1}
+          value={radius ?? ''}
+          placeholder={`기본 ${DEFAULT_REVEAL_RADIUS}`}
+          onChange={(e) => {
+            const n = optionalInt(e.target.value)
+            if (n === null || (n !== undefined && n < 1)) return
+            onChange(setRevealRadius(map, n))
+          }}
+        />
+      </label>
+      <p className="muted small">
+        미니맵은 처음에 가려져 있고(게임 화면은 처음부터 전체가 보임), 플레이어 둘레 {radius ?? DEFAULT_REVEAL_RADIUS}칸({2 * (radius ?? DEFAULT_REVEAL_RADIUS) + 1}×{2 * (radius ?? DEFAULT_REVEAL_RADIUS) + 1})이 지나가는 대로 밝혀집니다. 맵 전체를 처음부터 보여 주려면 맵 크기({Math.max(map.width, map.height)}) 이상으로 적습니다.
+      </p>
+    </div>
+  )
+}
+
+/** 단어 목록은 한 번만 받아 둔다 (오브젝트를 고를 때마다 다시 부르지 않게) */
+let wordListsCache: Promise<AdminWordList[]> | null = null
+
+interface ComputerEffect {
+  type: 'remove' | 'giveKey'
+  target?: string
+  keyId?: string
+}
+
+/** 감염된 컴퓨터: 단어 목록·단어 수·제한 시간·복구 효과 (docs/map-data.md 3.9) */
+function ComputerFields({ obj, objects, onChange }: { obj: MapObject; objects: MapObject[]; onChange: (patch: Record<string, unknown>) => void }) {
+  const [lists, setLists] = useState<AdminWordList[] | null>(null)
+  const [listError, setListError] = useState('')
+  useEffect(() => {
+    wordListsCache ??= fetchWordLists()
+    wordListsCache.then(setLists).catch(() => {
+      wordListsCache = null
+      setListError('단어 목록을 불러오지 못했습니다. ID를 직접 적어 주세요.')
+    })
+  }, [])
+
+  const intOrUndefined = (v: string) => (v.trim() === '' ? undefined : Number(v))
+  const effects = (Array.isArray(obj.effects) ? obj.effects : []) as ComputerEffect[]
+  const setEffects = (next: ComputerEffect[]) => onChange({ effects: next })
+  const targets = objects.filter((o) => o !== obj && o.type !== 'exit' && o.type !== 'checkpoint')
+  const listId = obj.wordListId === undefined ? '' : String(obj.wordListId)
+  const known = lists?.some((l) => String(l.wordListId) === listId) ?? false
+
+  return (
+    <>
+      <label>
+        이름 (해킹 창 제목, 선택)
+        <input value={String(obj.name ?? '')} placeholder="감염된 컴퓨터" onChange={(e) => onChange({ name: e.target.value || undefined })} />
+      </label>
+      <label>
+        단어 목록 (wordListId)
+        {lists ? (
+          <select value={listId} onChange={(e) => onChange({ wordListId: intOrUndefined(e.target.value) })}>
+            <option value="">없음 (게임 기본 단어)</option>
+            {listId && !known && <option value={listId}>#{listId} (없는 목록)</option>}
+            {lists.map((l) => (
+              <option key={l.wordListId} value={l.wordListId}>
+                #{l.wordListId} {l.name} ({l.words.length}개)
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input type="number" min={1} value={listId} onChange={(e) => onChange({ wordListId: intOrUndefined(e.target.value) })} />
+        )}
+      </label>
+      {listError && <p className="muted small">{listError}</p>}
+      <label>
+        단어 수 (wordCount, 1~20)
+        <input type="number" min={1} max={20} value={obj.wordCount === undefined ? '' : String(obj.wordCount)} placeholder="5" onChange={(e) => onChange({ wordCount: intOrUndefined(e.target.value) })} />
+      </label>
+      <label>
+        제한 시간 (timeLimit, 초, 5~300)
+        <input type="number" min={5} max={300} value={obj.timeLimit === undefined ? '' : String(obj.timeLimit)} placeholder="30" onChange={(e) => onChange({ timeLimit: intOrUndefined(e.target.value) })} />
+      </label>
+      <b className="small">복구하면 (effects)</b>
+      {effects.length === 0 && <p className="muted small">효과가 없습니다. 복구만 됩니다.</p>}
+      {effects.map((e, i) => (
+        <div key={i} className="row nowrap-row">
+          <select
+            value={e.type}
+            onChange={(ev) => setEffects(effects.map((x, j) => (j === i ? (ev.target.value === 'remove' ? { type: 'remove', target: '' } : { type: 'giveKey', keyId: 'key1' }) : x)))}
+            aria-label="효과 종류"
+          >
+            <option value="remove">없애기</option>
+            <option value="giveKey">열쇠 주기</option>
+          </select>
+          {e.type === 'remove' ? (
+            <select value={e.target ?? ''} onChange={(ev) => setEffects(effects.map((x, j) => (j === i ? { type: 'remove', target: ev.target.value } : x)))} aria-label="없앨 오브젝트">
+              <option value="">대상 고르기</option>
+              {e.target && !targets.some((t) => t.id === e.target) && <option value={e.target}>{e.target} (없음)</option>}
+              {targets.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.id} · {OBJECT_INFO[t.type as MapObjectType]?.label ?? t.type} ({t.x}, {t.y})
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input value={e.keyId ?? ''} placeholder="keyId" onChange={(ev) => setEffects(effects.map((x, j) => (j === i ? { type: 'giveKey', keyId: ev.target.value } : x)))} aria-label="열쇠 keyId" />
+          )}
+          <button type="button" className="secondary small-btn" onClick={() => setEffects(effects.filter((_, j) => j !== i))}>
+            빼기
+          </button>
+        </div>
+      ))}
+      <button type="button" className="secondary small-btn" onClick={() => setEffects([...effects, { type: 'remove', target: '' }])}>
+        + 효과 추가
+      </button>
+      <p className="muted small">E로 해킹을 시작할 때마다 1턴을 씁니다. 실패하면 다시 도전할 수 있고, 워프하면 복구 전 상태로 돌아갑니다.</p>
+    </>
   )
 }
