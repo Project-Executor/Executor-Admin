@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
 import {
+  autoCameraSize,
+  cameraSize,
+  DEFAULT_REVEAL_RADIUS,
   fillBorder,
+  revealRadius,
+  setCameraSize,
+  setRevealRadius,
   maxUnstable,
   nextCheckpointOrder,
   nextId,
@@ -219,6 +225,8 @@ export default function MapEditor({
             </button>
           </div>
 
+          <CameraBox map={map} onChange={onChange} />
+
           <div className="map-box">
             <b className="small">별 2 조건</b>
             <label>
@@ -389,6 +397,58 @@ function ObjectFields({ obj, onChange, onDelete }: { obj: MapObject; onChange: (
       <button type="button" className="danger small-btn" onClick={onDelete}>
         이 오브젝트 지우기
       </button>
+    </div>
+  )
+}
+
+/** 빈 칸이면 undefined, 아니면 정수 (잘못된 값은 null) */
+function optionalInt(text: string): number | undefined | null {
+  if (text.trim() === '') return undefined
+  const n = Number(text)
+  return Number.isInteger(n) ? n : null
+}
+
+/** 화면(카메라)과 미니맵 설정: camera.width·height, minimap.revealRadius (docs/map-data.md 3.8) */
+function CameraBox({ map, onChange }: { map: GridMap; onChange: (map: GridMap) => void }) {
+  const size = cameraSize(map)
+  const auto = autoCameraSize(map)
+  const radius = revealRadius(map)
+  const setSize = (key: 'width' | 'height', text: string) => {
+    const n = optionalInt(text)
+    if (n === null || (n !== undefined && n < 1)) return
+    onChange(setCameraSize(map, { ...size, [key]: n }))
+  }
+  return (
+    <div className="map-box">
+      <b className="small">화면·미니맵</b>
+      <label>
+        화면에 보일 칸 수 (camera, 가로 × 세로)
+        <div className="row">
+          <input type="number" min={3} max={map.width} value={size.width ?? ''} placeholder={`자동 ${auto.width}`} onChange={(e) => setSize('width', e.target.value)} aria-label="화면 가로 칸 수" className="size-input" />
+          ×
+          <input type="number" min={3} max={map.height} value={size.height ?? ''} placeholder={`자동 ${auto.height}`} onChange={(e) => setSize('height', e.target.value)} aria-label="화면 세로 칸 수" className="size-input" />
+        </div>
+      </label>
+      <p className="muted small">
+        비우면 자동(지금 맵은 {auto.width} × {auto.height}). 한쪽만 적으면 그쪽에 맞추고 다른 쪽은 화면 비율대로 보입니다. 맵보다 크게 적으면 맵 크기까지만 보입니다. M 키는 계속 맵 전체 보기입니다.
+      </p>
+      <label>
+        미니맵 밝힘 범위 (minimap.revealRadius, 플레이어 둘레 칸 수)
+        <input
+          type="number"
+          min={1}
+          value={radius ?? ''}
+          placeholder={`기본 ${DEFAULT_REVEAL_RADIUS}`}
+          onChange={(e) => {
+            const n = optionalInt(e.target.value)
+            if (n === null || (n !== undefined && n < 1)) return
+            onChange(setRevealRadius(map, n))
+          }}
+        />
+      </label>
+      <p className="muted small">
+        미니맵은 처음에 가려져 있고, 플레이어 둘레 {radius ?? DEFAULT_REVEAL_RADIUS}칸({2 * (radius ?? DEFAULT_REVEAL_RADIUS) + 1}×{2 * (radius ?? DEFAULT_REVEAL_RADIUS) + 1})이 지나가는 대로 밝혀집니다. 맵 전체를 처음부터 보여 주려면 맵 크기({Math.max(map.width, map.height)}) 이상으로 적습니다.
+      </p>
     </div>
   )
 }

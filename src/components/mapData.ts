@@ -228,6 +228,13 @@ export function validate(map: GridMap): string[] {
       issues.push('stars.maxUnstable은 0 이상 정수여야 합니다.')
     }
   }
+  const cam = map.rest.camera as Record<string, unknown> | undefined
+  for (const k of ['width', 'height'] as const) {
+    const v = cam?.[k]
+    if (v !== undefined && !(Number.isInteger(v) && (v as number) >= 3)) issues.push(`camera.${k}는 3 이상 정수여야 합니다.`)
+  }
+  const radius = (map.rest.minimap as Record<string, unknown> | undefined)?.revealRadius
+  if (radius !== undefined && !(Number.isInteger(radius) && (radius as number) >= 1)) issues.push('minimap.revealRadius는 1 이상 정수여야 합니다.')
   return issues
 }
 
@@ -241,6 +248,65 @@ export function nextCheckpointOrder(map: GridMap) {
 export function maxUnstable(map: GridMap): number {
   const v = (map.rest.stars as Record<string, unknown> | undefined)?.maxUnstable
   return Number.isInteger(v) && (v as number) >= 0 ? (v as number) : 0
+}
+
+/** 미니맵 기본 밝힘 범위 (Unity Board.DefaultRevealRadius) */
+export const DEFAULT_REVEAL_RADIUS = 2
+
+/** 카메라 구간 보기 크기 (camera.width·height). 없으면 undefined = 자동 */
+export function cameraSize(map: GridMap): { width?: number; height?: number } {
+  const cam = (map.rest.camera as Record<string, unknown> | undefined) ?? {}
+  const pick = (v: unknown) => (Number.isInteger(v) && (v as number) > 0 ? (v as number) : undefined)
+  return { width: pick(cam.width), height: pick(cam.height) }
+}
+
+/** camera 크기를 바꾼다. 둘 다 비우면 camera 필드를 지운다 (자동) */
+export function setCameraSize(map: GridMap, size: { width?: number; height?: number }): GridMap {
+  const rest = { ...map.rest }
+  const cam: Record<string, number> = {}
+  if (size.width !== undefined) cam.width = size.width
+  if (size.height !== undefined) cam.height = size.height
+  if (Object.keys(cam).length) rest.camera = cam
+  else delete rest.camera
+  return { ...map, rest }
+}
+
+/**
+ * camera를 비웠을 때 게임이 쓰는 자동 크기 (Unity BoardView.SegmentView와 같은 계산):
+ * 시작 → 체크포인트 1 → … → 출구 구간 중 가장 넓은 구간 + 여백 2칸, 최소 9×7, 맵 크기 이하
+ */
+export function autoCameraSize(map: GridMap): { width: number; height: number } {
+  const stops: { x: number; y: number }[] = [map.player]
+  for (let order = 1; ; order++) {
+    const cp = map.objects.find((o) => o.type === 'checkpoint' && o.order === order)
+    if (!cp) break
+    stops.push(cp)
+  }
+  const exit = map.objects.find((o) => o.type === 'exit')
+  if (exit) stops.push(exit)
+  let w = 9
+  let h = 7
+  for (let i = 0; i + 1 < stops.length; i++) {
+    w = Math.max(w, Math.abs(stops[i + 1].x - stops[i].x) + 1 + 4)
+    h = Math.max(h, Math.abs(stops[i + 1].y - stops[i].y) + 1 + 4)
+  }
+  return { width: Math.min(map.width, w), height: Math.min(map.height, h) }
+}
+
+/** 미니맵 밝힘 범위 (minimap.revealRadius). 없으면 undefined = 기본값 */
+export function revealRadius(map: GridMap): number | undefined {
+  const v = (map.rest.minimap as Record<string, unknown> | undefined)?.revealRadius
+  return Number.isInteger(v) && (v as number) >= 1 ? (v as number) : undefined
+}
+
+export function setRevealRadius(map: GridMap, value: number | undefined): GridMap {
+  const rest = { ...map.rest }
+  const minimap = { ...((rest.minimap as Record<string, unknown> | undefined) ?? {}) }
+  if (value === undefined) delete minimap.revealRadius
+  else minimap.revealRadius = value
+  if (Object.keys(minimap).length) rest.minimap = minimap
+  else delete rest.minimap
+  return { ...map, rest }
 }
 
 export function setMaxUnstable(map: GridMap, value: number): GridMap {
