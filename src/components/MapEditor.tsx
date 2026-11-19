@@ -430,7 +430,7 @@ function CameraBox({ map, onChange }: { map: GridMap; onChange: (map: GridMap) =
         </div>
       </label>
       <p className="muted small">
-        비우면 자동(지금 맵은 {auto.width} × {auto.height}). 한쪽만 적으면 그쪽에 맞추고 다른 쪽은 화면 비율대로 보입니다. 맵보다 크게 적으면 맵 크기까지만 보입니다. M 키는 맵 전체 크기로 보여 줍니다(가 보지 않은 곳은 가려진 채).
+        비우면 자동(지금 맵은 {auto.width} × {auto.height}). 한쪽만 적으면 그쪽에 맞추고 다른 쪽은 화면 비율대로 보입니다. 맵보다 크게 적으면 맵 크기까지만 보입니다. M 키는 맵 전체 보기입니다.
       </p>
       <label>
         미니맵 밝힘 범위 (minimap.revealRadius, 플레이어 둘레 칸 수)
@@ -447,7 +447,7 @@ function CameraBox({ map, onChange }: { map: GridMap; onChange: (map: GridMap) =
         />
       </label>
       <p className="muted small">
-        게임 화면과 미니맵은 처음에 가려져 있고, 플레이어 둘레 {radius ?? DEFAULT_REVEAL_RADIUS}칸({2 * (radius ?? DEFAULT_REVEAL_RADIUS) + 1}×{2 * (radius ?? DEFAULT_REVEAL_RADIUS) + 1})이 지나가는 대로 밝혀집니다. 맵 전체를 처음부터 보여 주려면 맵 크기({Math.max(map.width, map.height)}) 이상으로 적습니다.
+        미니맵은 처음에 가려져 있고(게임 화면은 처음부터 전체가 보임), 플레이어 둘레 {radius ?? DEFAULT_REVEAL_RADIUS}칸({2 * (radius ?? DEFAULT_REVEAL_RADIUS) + 1}×{2 * (radius ?? DEFAULT_REVEAL_RADIUS) + 1})이 지나가는 대로 밝혀집니다. 맵 전체를 처음부터 보여 주려면 맵 크기({Math.max(map.width, map.height)}) 이상으로 적습니다.
       </p>
     </div>
   )
