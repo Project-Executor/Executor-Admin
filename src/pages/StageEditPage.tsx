@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { createStage, deleteStage, fetchOperations, fetchStage, updateStage } from '../api/admin'
+import { createStage, deleteStage, fetchLayers, fetchOperations, fetchStage, updateStage } from '../api/admin'
 import { ApiError } from '../api/client'
 import { STAGE_TYPE_LABEL } from '../api/types'
-import type { AdminOperationTree, AdminStage, AdminStageRequest, StageType } from '../api/types'
+import type { AdminLayer, AdminOperationTree, AdminStage, AdminStageRequest, StageType } from '../api/types'
 import { formatDateTime } from '../components/datetime'
+import { operationLabel } from '../components/operationLabel'
 import MapEditor from '../components/MapEditor.tsx'
 import { fromJson, newMap, toJson, validate } from '../components/mapData'
 import type { GridMap } from '../components/mapData'
@@ -38,6 +39,7 @@ export default function StageEditPage() {
   const navigate = useNavigate()
 
   const [ops, setOps] = useState<AdminOperationTree[]>([])
+  const [layers, setLayers] = useState<AdminLayer[]>([])
   const [loaded, setLoaded] = useState<AdminStage | null>(null)
   const [loadError, setLoadError] = useState('')
 
@@ -104,6 +106,13 @@ export default function StageEditPage() {
 
   useEffect(() => {
     let cancelled = false
+    fetchLayers()
+      .then((res) => {
+        if (!cancelled) setLayers(res)
+      })
+      .catch(() => {
+        /* 레이어 이름 없이 작전 번호만 보인다 */
+      })
     fetchOperations()
       .then((res) => {
         if (!cancelled) setOps(res)
@@ -208,7 +217,7 @@ export default function StageEditPage() {
   return (
     <section>
       <p className="small">
-        <Link to={backTo}>← 작전·스테이지</Link>
+        <Link to={backTo}>← 레이어·작전</Link>
       </p>
       <div className="row title-row">
         <h2>{isNew ? '새 스테이지' : `스테이지 #${stageId}`}</h2>
@@ -234,7 +243,7 @@ export default function StageEditPage() {
                 <option value="">고르세요</option>
                 {ops.map((o) => (
                   <option key={o.operationId} value={o.operationId}>
-                    {o.sortOrder}. {o.name}
+                    {operationLabel(o, layers)}
                   </option>
                 ))}
               </select>
@@ -348,7 +357,7 @@ function Back({ to, message }: { to: string; message: string }) {
   return (
     <section>
       <p className="small">
-        <Link to={to}>← 작전·스테이지</Link>
+        <Link to={to}>← 레이어·작전</Link>
       </p>
       <p className="error">{message}</p>
     </section>

@@ -233,13 +233,34 @@ export interface AdminStageSummary {
   updatedAt: string
 }
 
-/** GET /admin/operations 항목 */
+/** GET /admin/layers 항목. 레이어(대주제) 안에 작전(소주제)이 들어간다 */
+export interface AdminLayer {
+  layerId: number
+  name: string
+  description: string | null
+  /** 표시·플레이 순서 (튜토리얼 = 0), 레이어끼리 겹칠 수 없다 */
+  sortOrder: number
+  /** 소속 작전 수 (0이어야 삭제할 수 있다) */
+  operationCount: number
+}
+
+export interface AdminLayerRequest {
+  /** 1~100자, 겹치면 409 */
+  name: string
+  /** 255자 이하 */
+  description: string | null
+  /** 0 이상, 겹치면 409 */
+  sortOrder: number
+}
+
+/** GET /admin/operations 항목 (플레이 순서: 레이어 -> 작전) */
 export interface AdminOperationTree {
   operationId: number
   name: string
   description: string | null
-  /** 표시 순서 (튜토리얼 = 0), 작전끼리 겹칠 수 없다 */
+  /** 레이어 안에서의 순서 (튜토리얼 = 0), 같은 레이어 안에서 겹칠 수 없다 */
   sortOrder: number
+  layerId: number
   /** 번호 순 */
   stages: AdminStageSummary[]
 }
@@ -249,8 +270,10 @@ export interface AdminOperationRequest {
   name: string
   /** 255자 이하 */
   description: string | null
-  /** 0 이상, 겹치면 409 */
+  /** 0 이상, 같은 레이어 안에서 겹치면 409 */
   sortOrder: number
+  /** 소속 레이어 (필수) */
+  layerId: number
 }
 
 export interface AdminOperation {
@@ -258,6 +281,7 @@ export interface AdminOperation {
   name: string
   description: string | null
   sortOrder: number
+  layerId: number
 }
 
 /** GET /admin/stages/{id}. mapData에 hints가 그대로 들어 있다 */
