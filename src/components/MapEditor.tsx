@@ -15,6 +15,8 @@ import {
   objectAt,
   resize,
   setMaxUnstable,
+  setStarBonus,
+  starBonus,
   validate,
   MAX_SIZE,
   MIN_SIZE,
@@ -249,11 +251,9 @@ export default function MapEditor({
               체크포인트 {map.objects.filter((o) => o.type === 'checkpoint').length}개 · 구간 {map.objects.filter((o) => o.type === 'checkpoint').length + 1}개. 첫 구간의 턴은 스테이지
               기준 턴입니다.
             </p>
-            <p className="muted small">
-              ★3: 숨겨진 요소 {map.objects.filter((o) => o.type === 'hidden').length}개를 모두 모으기
-              {map.objects.some((o) => o.type === 'hidden') ? '' : ' (없으면 ★3을 얻을 수 없음)'}
-            </p>
           </div>
+
+          <StarBonusBox map={map} onChange={onChange} />
 
           <div className="map-box">
             <b className="small">선택한 오브젝트</b>
@@ -581,3 +581,74 @@ function ComputerFields({ obj, objects, onChange }: { obj: MapObject; objects: M
     </>
   )
 }
+
+/** 별 3 조건 고르기: 숨겨진 요소 모두 찾기(기본) / 감염된 컴퓨터를 n초 안에 복구 (docs/map-data.md 3.4) */
+function StarBonusBox({ map, onChange }: { map: GridMap; onChange: (map: GridMap) => void }) {
+  const bonus = starBonus(map)
+  const hiddenCount = map.objects.filter((o) => o.type === 'hidden').length
+  const computers = map.objects.filter((o) => o.type === 'computer')
+  const target = computers.find((c) => c.id === bonus.target)
+  const limit = target && Number.isInteger(target.timeLimit) ? (target.timeLimit as number) : 30
+  return (
+    <div className="map-box">
+      <b className="small">별 3 조건</b>
+      <label>
+        조건 (stars.bonus)
+        <select
+          value={bonus.type}
+          onChange={(e) =>
+            onChange(
+              e.target.value === 'hack'
+                ? setStarBonus(map, { type: 'hack', target: computers[0]?.id, seconds: 15 })
+                : setStarBonus(map, { type: 'hidden' }),
+            )
+          }
+        >
+          <option value="hidden">숨겨진 요소 모두 찾기</option>
+          <option value="hack">감염된 컴퓨터를 시간 안에 복구</option>
+        </select>
+      </label>
+      {bonus.type === 'hidden' ? (
+        <p className="muted small">
+          숨겨진 요소 {hiddenCount}개를 모두 모으면 ★3{hiddenCount === 0 ? ' (지금은 숨겨진 요소가 없어 ★3을 얻을 수 없음)' : ''}
+        </p>
+      ) : (
+        <>
+          <label>
+            컴퓨터 (target)
+            <select value={bonus.target ?? ''} onChange={(e) => onChange(setStarBonus(map, { ...bonus, target: e.target.value }))}>
+              <option value="">고르기</option>
+              {bonus.target && !target && <option value={bonus.target}>{bonus.target} (없음)</option>}
+              {computers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.id}
+                  {c.name ? ` · ${String(c.name)}` : ''} ({c.x}, {c.y})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            목표 시간 (seconds, 초)
+            <input
+              type="number"
+              min={1}
+              max={300}
+              step={0.5}
+              value={bonus.seconds === undefined ? '' : String(bonus.seconds)}
+              onChange={(e) => {
+                const n = Number(e.target.value)
+                if (e.target.value.trim() !== '' && Number.isFinite(n)) onChange(setStarBonus(map, { ...bonus, seconds: n }))
+              }}
+            />
+          </label>
+          <p className="muted small">
+            {computers.length === 0
+              ? '맵에 감염된 컴퓨터(M)가 없습니다. 먼저 놓으세요.'
+              : `그 컴퓨터를 해킹 시작부터 ${bonus.seconds ?? '?'}초 안에 복구하면 ★3 (컴퓨터 제한 시간 ${limit}초). 한 판에 한 번이라도 해내면 인정되고 워프해도 유지됩니다. 숨겨진 요소는 ★3과 상관없어집니다.`}
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+

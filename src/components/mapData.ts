@@ -237,6 +237,17 @@ export function validate(map: GridMap): string[] {
       issues.push('stars.maxUnstable은 0 이상 정수여야 합니다.')
     }
   }
+  const bonus = starBonus(map)
+  if (bonus.type === 'hack') {
+    const pc = objects.find((o) => o.id === bonus.target)
+    if (!bonus.target) issues.push('★3 조건(컴퓨터 시간)의 컴퓨터를 고르세요.')
+    else if (!pc || pc.type !== 'computer') issues.push(`★3 조건의 '${bonus.target}'은(는) 감염된 컴퓨터가 아닙니다.`)
+    if (!(typeof bonus.seconds === 'number' && bonus.seconds > 0 && bonus.seconds <= 300)) issues.push('★3 조건의 목표 시간은 0초보다 크고 300초 이하여야 합니다.')
+    else if (pc && pc.type === 'computer') {
+      const limit = Number.isInteger(pc.timeLimit) ? (pc.timeLimit as number) : 30
+      if (bonus.seconds >= limit) issues.push(`★3 목표 시간(${bonus.seconds}초)이 그 컴퓨터의 제한 시간(${limit}초) 이상이라, 복구만 하면 ★3이 됩니다.`)
+    }
+  }
   for (const o of objects) {
     if (o.type !== 'computer') continue
     const at = `${o.id} ${pos(o)}`
@@ -349,6 +360,33 @@ export function setRevealRadius(map: GridMap, value: number | undefined): GridMa
   if (Object.keys(minimap).length) rest.minimap = minimap
   else delete rest.minimap
   return { ...map, rest }
+}
+
+/** 별 3 조건 (stars.bonus). 없으면 숨겨진 요소 (docs/map-data.md 3.4) */
+export interface StarBonus {
+  type: 'hidden' | 'hack'
+  /** hack: 컴퓨터 id */
+  target?: string
+  /** hack: 목표 시간(초) */
+  seconds?: number
+}
+
+export function starBonus(map: GridMap): StarBonus {
+  const b = (map.rest.stars as Record<string, unknown> | undefined)?.bonus as Record<string, unknown> | undefined
+  if (!b || b.type !== 'hack') return { type: 'hidden' }
+  return {
+    type: 'hack',
+    target: typeof b.target === 'string' ? b.target : undefined,
+    seconds: typeof b.seconds === 'number' ? b.seconds : undefined,
+  }
+}
+
+/** 별 3 조건을 바꾼다. hidden이면 bonus를 지운다 (기본값) */
+export function setStarBonus(map: GridMap, bonus: StarBonus): GridMap {
+  const stars: Record<string, unknown> = { ...((map.rest.stars as Record<string, unknown> | undefined) ?? {}) }
+  if (bonus.type === 'hidden') delete stars.bonus
+  else stars.bonus = { type: 'hack', target: bonus.target ?? '', seconds: bonus.seconds ?? 15 }
+  return { ...map, rest: { ...map.rest, stars } }
 }
 
 export function setMaxUnstable(map: GridMap, value: number): GridMap {
