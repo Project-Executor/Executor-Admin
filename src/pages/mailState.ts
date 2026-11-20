@@ -1,6 +1,6 @@
 import type { AdminUser, Role } from '../api/types'
 
-/** 우편 받는 사람. 검색·ID 조회·유저 관리 어디서 추가하든 서버에서 확인한 사용자만 들어간다 */
+/** 메일 받는 사람. 검색·ID 조회·유저 관리 어디서 추가하든 서버에서 확인한 사용자만 들어간다 */
 export interface Receiver {
   userId: number
   nickname: string | null

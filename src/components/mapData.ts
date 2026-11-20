@@ -1,6 +1,7 @@
 // map_data v1 (Executor-Server docs/map-data.md) 편집 도우미.
 // 격자 편집기는 width·height·tiles·player·objects만 다루고, 나머지 필드(dialogues, guides, story 등)는 그대로 둔다.
 
+import { starIssues } from './stars.ts'
 export type Tile = '#' | '.'
 
 export type MapObjectType = 'exit' | 'crate' | 'breakable' | 'key' | 'door' | 'npc' | 'checkpoint' | 'hidden' | 'anomaly' | 'fakeWall' | 'computer'
@@ -31,12 +32,12 @@ export const MAX_SIZE = 40
 export const OBJECT_INFO: Record<MapObjectType, { label: string; symbol: string; defaults: Record<string, unknown> }> = {
   exit: { label: '출구', symbol: 'E', defaults: {} },
   crate: { label: '상자', symbol: 'C', defaults: {} },
-  breakable: { label: '부서지는 블록', symbol: 'B', defaults: { hp: 1 } },
+  breakable: { label: '방화벽', symbol: 'B', defaults: { hp: 1 } },
   key: { label: '열쇠', symbol: 'K', defaults: { keyId: 'key1' } },
   door: { label: '잠긴 문', symbol: 'D', defaults: { keyId: 'key1' } },
   npc: { label: '인물', symbol: 'N', defaults: { name: '인물', dialogueId: 'npc1' } },
   checkpoint: { label: '체크포인트', symbol: 'S', defaults: { turns: 10 } },
-  hidden: { label: '숨겨진 요소', symbol: 'H', defaults: {} },
+  hidden: { label: '데이터 파편', symbol: 'H', defaults: {} },
   anomaly: { label: '이상 개체', symbol: 'A', defaults: { name: '이상 개체' } },
   fakeWall: { label: '가짜 벽', symbol: 'F', defaults: {} },
   computer: { label: '감염된 컴퓨터', symbol: 'M', defaults: { wordCount: 5, timeLimit: 30, effects: [] } },
@@ -230,24 +231,7 @@ export function validate(map: GridMap): string[] {
   const missing = orders.length ? Array.from({ length: orders[orders.length - 1] }, (_, i) => i + 1).filter((n) => !orders.includes(n)) : []
   if (missing.length) issues.push(`체크포인트 order ${missing.join(', ')}번이 비어 있습니다. 1부터 차례로 매기세요.`)
 
-  const stars = map.rest.stars
-  if (stars !== undefined) {
-    const max = (stars as Record<string, unknown> | null)?.maxUnstable
-    if (stars === null || typeof stars !== 'object' || (max !== undefined && !(Number.isInteger(max) && (max as number) >= 0))) {
-      issues.push('stars.maxUnstable은 0 이상 정수여야 합니다.')
-    }
-  }
-  const bonus = starBonus(map)
-  if (bonus.type === 'hack') {
-    const pc = objects.find((o) => o.id === bonus.target)
-    if (!bonus.target) issues.push('★3 조건(컴퓨터 시간)의 컴퓨터를 고르세요.')
-    else if (!pc || pc.type !== 'computer') issues.push(`★3 조건의 '${bonus.target}'은(는) 감염된 컴퓨터가 아닙니다.`)
-    if (!(typeof bonus.seconds === 'number' && bonus.seconds > 0 && bonus.seconds <= 300)) issues.push('★3 조건의 목표 시간은 0초보다 크고 300초 이하여야 합니다.')
-    else if (pc && pc.type === 'computer') {
-      const limit = Number.isInteger(pc.timeLimit) ? (pc.timeLimit as number) : 30
-      if (bonus.seconds >= limit) issues.push(`★3 목표 시간(${bonus.seconds}초)이 그 컴퓨터의 제한 시간(${limit}초) 이상이라, 복구만 하면 ★3이 됩니다.`)
-    }
-  }
+  issues.push(...starIssues(map))
   for (const o of objects) {
     if (o.type !== 'computer') continue
     const at = `${o.id} ${pos(o)}`
@@ -360,33 +344,6 @@ export function setRevealRadius(map: GridMap, value: number | undefined): GridMa
   if (Object.keys(minimap).length) rest.minimap = minimap
   else delete rest.minimap
   return { ...map, rest }
-}
-
-/** 별 3 조건 (stars.bonus). 없으면 숨겨진 요소 (docs/map-data.md 3.4) */
-export interface StarBonus {
-  type: 'hidden' | 'hack'
-  /** hack: 컴퓨터 id */
-  target?: string
-  /** hack: 목표 시간(초) */
-  seconds?: number
-}
-
-export function starBonus(map: GridMap): StarBonus {
-  const b = (map.rest.stars as Record<string, unknown> | undefined)?.bonus as Record<string, unknown> | undefined
-  if (!b || b.type !== 'hack') return { type: 'hidden' }
-  return {
-    type: 'hack',
-    target: typeof b.target === 'string' ? b.target : undefined,
-    seconds: typeof b.seconds === 'number' ? b.seconds : undefined,
-  }
-}
-
-/** 별 3 조건을 바꾼다. hidden이면 bonus를 지운다 (기본값) */
-export function setStarBonus(map: GridMap, bonus: StarBonus): GridMap {
-  const stars: Record<string, unknown> = { ...((map.rest.stars as Record<string, unknown> | undefined) ?? {}) }
-  if (bonus.type === 'hidden') delete stars.bonus
-  else stars.bonus = { type: 'hack', target: bonus.target ?? '', seconds: bonus.seconds ?? 15 }
-  return { ...map, rest: { ...map.rest, stars } }
 }
 
 export function setMaxUnstable(map: GridMap, value: number): GridMap {

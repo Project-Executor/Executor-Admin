@@ -44,12 +44,12 @@ export interface AdminItem {
   description: string | null
   itemType: ItemType
   price: number
-  /** false면 판매 중단 (우편 보상으로는 보낼 수 있음) */
+  /** false면 판매 중단 (메일 보상으로는 보낼 수 있음) */
   isActive: boolean
   createdAt: string
 }
 
-// ---------- 우편 (POST /admin/mails) ----------
+// ---------- 메일 (POST /admin/mails) ----------
 export interface AdminMailRequest {
   /** toAll이 false일 때 받는 사람 (최대 1000명, 중복은 한 번만) */
   receiverIds: number[] | null

@@ -79,7 +79,7 @@ export const suspendUser = (userId: number, until: string | null, reason: string
 /** 정지 해제 */
 export const unsuspendUser = (userId: number) => api<AdminUser>('DELETE', `/admin/users/${userId}/suspension`)
 
-/** 우편 발송. 없는 사용자가 있으면 404로 아무에게도 보내지 않는다 */
+/** 메일 발송. 없는 사용자가 있으면 404로 아무에게도 보내지 않는다 */
 export const sendMail = (request: AdminMailRequest) => post<AdminMailResponse>('/admin/mails', request)
 
 // ---------- 공지 ----------
