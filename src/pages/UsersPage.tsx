@@ -122,7 +122,7 @@ export default function UsersPage() {
             <b>{selected.size}명</b> 선택
           </span>
           <button type="button" onClick={() => mailTo([...selected.values()])}>
-            선택한 사람에게 우편
+            선택한 사람에게 메일
           </button>
           <button type="button" className="secondary" onClick={() => setSelected(new Map())}>
             선택 해제
@@ -168,7 +168,7 @@ export default function UsersPage() {
                 <td className="nowrap">{formatDate(u.createdAt)}</td>
                 <td className="actions-cell">
                   <button type="button" className="secondary small-btn" onClick={() => mailTo([u])}>
-                    우편
+                    메일
                   </button>
                 </td>
               </tr>

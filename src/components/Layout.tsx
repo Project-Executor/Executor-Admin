@@ -4,7 +4,7 @@ import { useAuth } from '../auth/context'
 /** 메뉴. path가 없으면 아직 만들지 않은 기능 (준비 중으로 표시) */
 const MENU: { label: string; path?: string }[] = [
   { label: '홈', path: '/' },
-  { label: '우편 발송', path: '/mails' },
+  { label: '메일 발송', path: '/mails' },
   { label: '공지사항', path: '/notices' },
   { label: '유저 관리', path: '/users' },
   { label: '신고', path: '/reports' },

@@ -4,7 +4,7 @@ import { useAuth } from '../auth/context'
 const SHORTCUTS: { to: string; title: string; desc: string }[] = [
   { to: '/reports', title: '신고', desc: '접수된 신고 확인과 처리' },
   { to: '/users', title: '유저 관리', desc: '검색, 코인 조정, 권한 변경, 정지' },
-  { to: '/mails', title: '우편 발송', desc: '전체 또는 지정한 사용자에게 보상' },
+  { to: '/mails', title: '메일 발송', desc: '전체 또는 지정한 사용자에게 보상' },
   { to: '/notices', title: '공지사항', desc: '게임 공지 작성, 예약, 숨김' },
   { to: '/stages', title: '레이어·작전', desc: '레이어·작전·공식 스테이지와 맵 편집' },
   { to: '/items', title: '아이템', desc: '상점 아이템 등록, 판매 중단' },

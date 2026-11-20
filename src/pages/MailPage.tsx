@@ -13,7 +13,7 @@ const CONTENT_MAX = 2000
 const COIN_MAX = 1_000_000
 const RECEIVER_MAX = 1000
 
-/** 우편 발송 (POST /api/admin/mails). 전체 또는 지정한 사용자에게 코인·아이템을 첨부해 보낸다 */
+/** 메일 발송 (POST /api/admin/mails). 전체 또는 지정한 사용자에게 코인·아이템을 첨부해 보낸다 */
 export default function MailPage() {
   const location = useLocation()
   const [items, setItems] = useState<AdminItem[]>([])
@@ -159,8 +159,8 @@ export default function MailPage() {
     ].filter(Boolean).join(', ') || '없음'
     const expiry = req.expiresAt ? new Date(req.expiresAt).toLocaleString() : '무기한'
     const summary = `받는 사람: ${who}\n제목: ${req.title}\n보상: ${reward}\n만료: ${expiry}`
-    if (!window.confirm(`이 우편을 보낼까요?\n\n${summary}`)) return
-    if (req.toAll && !window.confirm('모든 사용자에게 보냅니다. 보낸 우편은 되돌릴 수 없습니다. 정말 보낼까요?')) return
+    if (!window.confirm(`이 메일을 보낼까요?\n\n${summary}`)) return
+    if (req.toAll && !window.confirm('모든 사용자에게 보냅니다. 보낸 메일은 되돌릴 수 없습니다. 정말 보낼까요?')) return
 
     setSending(true)
     try {
@@ -182,8 +182,8 @@ export default function MailPage() {
 
   return (
     <section>
-      <h2>우편 발송</h2>
-      <p className="muted">코인·아이템을 첨부해 우편을 보냅니다. 보낸 우편은 되돌릴 수 없습니다.</p>
+      <h2>메일 발송</h2>
+      <p className="muted">코인·아이템을 첨부해 메일을 보냅니다. 보낸 메일은 되돌릴 수 없습니다.</p>
 
       <form className="card form" onSubmit={submit}>
         {/* 받는 사람 */}

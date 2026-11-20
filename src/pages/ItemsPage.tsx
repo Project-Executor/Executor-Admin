@@ -44,7 +44,7 @@ export default function ItemsPage() {
     const next = !item.isActive
     const msg = next
       ? `'${item.name}'을(를) 다시 판매할까요?`
-      : `'${item.name}'의 판매를 멈출까요?\n\n상점에서 사라지지만, 이미 가진 사람은 그대로 쓰고 우편 보상으로는 보낼 수 있습니다.`
+      : `'${item.name}'의 판매를 멈출까요?\n\n상점에서 사라지지만, 이미 가진 사람은 그대로 쓰고 메일 보상으로는 보낼 수 있습니다.`
     if (!window.confirm(msg)) return
     setError('')
     setBusyId(item.itemId)

@@ -69,7 +69,7 @@ export default function UserDetailPage() {
           className="secondary"
           onClick={() => navigate('/mails', { state: { receivers: [toReceiver(user)] } satisfies MailPageState })}
         >
-          우편 보내기
+          메일 보내기
         </button>
       </div>
 
@@ -221,7 +221,7 @@ function CoinForm({ user, onDone }: { user: AdminUserDetail; onDone: (coin: numb
           {busy ? '처리 중...' : mode === 'add' ? '더하기' : '빼기'}
         </button>
       </div>
-      <p className="muted small">보상은 우편으로 보내는 것을 권합니다. 여기서는 바로 반영되고 사용자에게 알림이 가지 않습니다.</p>
+      <p className="muted small">보상은 메일로 보내는 것을 권합니다. 여기서는 바로 반영되고 사용자에게 알림이 가지 않습니다.</p>
       {error && <p className="error">{error}</p>}
       {result && <p className="success">{result}</p>}
     </form>
@@ -239,7 +239,7 @@ function RoleForm({ user, isSelf, onDone }: { user: AdminUserDetail; isSelf: boo
     setResult('')
     const warn =
       next === 'ADMIN'
-        ? '관리자가 되면 관리자 웹에 들어올 수 있고 우편·코인·권한을 바꿀 수 있습니다.'
+        ? '관리자가 되면 관리자 웹에 들어올 수 있고 메일·코인·권한을 바꿀 수 있습니다.'
         : '관리자 웹에 더 이상 들어올 수 없습니다.'
     if (!window.confirm(`${user.nickname ?? user.email}의 권한을 ${ROLE_LABEL[next]}(으)로 바꿀까요?\n\n${warn}`)) return
 
