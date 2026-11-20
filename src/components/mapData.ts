@@ -32,7 +32,7 @@ export const MAX_SIZE = 40
 export const OBJECT_INFO: Record<MapObjectType, { label: string; symbol: string; defaults: Record<string, unknown> }> = {
   exit: { label: '출구', symbol: 'E', defaults: {} },
   crate: { label: '상자', symbol: 'C', defaults: {} },
-  breakable: { label: '부서지는 블록', symbol: 'B', defaults: { hp: 1 } },
+  breakable: { label: '방화벽', symbol: 'B', defaults: { hp: 1 } },
   key: { label: '열쇠', symbol: 'K', defaults: { keyId: 'key1' } },
   door: { label: '잠긴 문', symbol: 'D', defaults: { keyId: 'key1' } },
   npc: { label: '인물', symbol: 'N', defaults: { name: '인물', dialogueId: 'npc1' } },
