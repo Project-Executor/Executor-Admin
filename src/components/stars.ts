@@ -70,7 +70,8 @@ function writeCond(c: StarCond): Record<string, unknown> {
     out.target = c.target ?? ''
     out.seconds = c.seconds ?? 15
   }
-  if (c.text?.trim()) out.text = c.text.trim()
+  // 입력 중에는 친 그대로 둔다 (여기서 앞뒤 공백을 지우면 단어 사이 띄어쓰기를 칠 수 없다). 저장할 때 trimStarTexts로 정리
+  if (c.text?.trim()) out.text = c.text
   return out
 }
 
@@ -88,9 +89,21 @@ export function writeStars(map: GridMap, s: StarSettings): GridMap {
     star3: writeCond(s.star3),
     maxUnstable: s.star2.type === 'stable' ? Math.max(0, s.star2.value ?? 0) : 0,
   }
-  if (s.star1Text?.trim()) stars.star1 = { text: s.star1Text.trim() }
+  if (s.star1Text?.trim()) stars.star1 = { text: s.star1Text }
   else delete stars.star1
   return { ...map, rest: { ...map.rest, stars } }
+}
+
+/** 저장 직전: 별 문구의 앞뒤 공백을 지운다 (map_data.stars.star1~3.text) */
+export function trimStarTexts(data: Record<string, unknown>): Record<string, unknown> {
+  const stars = data.stars
+  if (!stars || typeof stars !== 'object' || Array.isArray(stars)) return data
+  const next: Record<string, unknown> = { ...(stars as Record<string, unknown>) }
+  for (const key of ['star1', 'star2', 'star3']) {
+    const c = next[key] as Record<string, unknown> | undefined
+    if (c && typeof c === 'object' && typeof c.text === 'string') next[key] = { ...c, text: c.text.trim() }
+  }
+  return { ...data, stars: next }
 }
 
 function computerName(c: StarCond, objects: MapObject[]) {

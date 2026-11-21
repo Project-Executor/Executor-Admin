@@ -10,6 +10,7 @@ import { operationLabel } from '../components/operationLabel'
 import StoryEditor from '../components/StoryEditor.tsx'
 import MapEditor from '../components/MapEditor.tsx'
 import { fromJson, newMap, toJson, validate } from '../components/mapData'
+import { trimStarTexts } from '../components/stars'
 import type { GridMap } from '../components/mapData'
 
 const TITLE_MAX = 100
@@ -160,7 +161,7 @@ export default function StageEditPage() {
     if (!Number.isInteger(coin) || coin < 0) return '보상 코인은 0 이상 정수여야 합니다.'
     const map = currentMap()
     if ('error' in map) return map.error
-    return { operationId: op, stageNo: no, stageType, title: t, mapData: map.value, parMoves: par, rewardCoin: coin }
+    return { operationId: op, stageNo: no, stageType, title: t, mapData: trimStarTexts(map.value), parMoves: par, rewardCoin: coin }
   }
 
   async function submit(e: FormEvent) {
