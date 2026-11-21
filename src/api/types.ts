@@ -250,6 +250,28 @@ export interface AdminWordListRequest {
   words: string[]
 }
 
+/** GET /admin/characters 항목. 대사의 speaker = name, portrait의 인물 ID = characterKey */
+export interface AdminCharacter {
+  characterId: number
+  /** 일러스트 폴더 ID (Resources/Portraits/{characterKey}) */
+  characterKey: string
+  name: string
+  /** 이름표 바탕색 #RRGGBB */
+  tagColor: string
+  /** 대화창 왼쪽(주인공 자리) */
+  protagonist: boolean
+}
+
+export interface AdminCharacterRequest {
+  /** 영문 소문자·숫자·-·_ 1~50자, 겹치면 409 */
+  characterKey: string
+  /** 1~50자, 겹치면 409 */
+  name: string
+  /** #RRGGBB */
+  tagColor: string
+  protagonist: boolean
+}
+
 /** GET /admin/layers 항목. 레이어(대주제) 안에 작전(소주제)이 들어간다 */
 export interface AdminLayer {
   layerId: number
