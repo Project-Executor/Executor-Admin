@@ -8,6 +8,8 @@ export interface StoryStep {
   speaker?: string
   portrait?: string
   background?: string
+  /** dialogue 단계: 맵 dialogues의 키 */
+  dialogueId?: string
   [field: string]: unknown
 }
 
@@ -73,8 +75,8 @@ export function readDialogues(v: unknown): Dialogues {
   return result
 }
 
-/** 대화 문제 (없는 노드로 가는 next·선택지, 시작 노드 없음) */
-export function dialogueIssues(dialogues: Dialogues, npcDialogueIds: string[]): string[] {
+/** 대화 문제 (없는 노드로 가는 next·선택지, 시작 노드 없음, 인물·이야기가 쓰는데 없는 대화) */
+export function dialogueIssues(dialogues: Dialogues, npcDialogueIds: string[], storyDialogueIds: string[] = []): string[] {
   const issues: string[] = []
   for (const [id, d] of Object.entries(dialogues)) {
     if (!d.nodes[d.start]) issues.push(`대화 ${id}: 시작 노드 '${d.start}'가 없습니다.`)
@@ -85,5 +87,9 @@ export function dialogueIssues(dialogues: Dialogues, npcDialogueIds: string[]): 
     }
   }
   for (const id of new Set(npcDialogueIds)) if (id && !dialogues[id]) issues.push(`인물이 쓰는 대화 '${id}'가 없습니다. (게임에서 대화가 열리지 않음)`)
+  for (const id of new Set(storyDialogueIds)) {
+    if (!id) issues.push('이야기의 대화 단계에 대화가 골라져 있지 않습니다. (게임에서 건너뜀)')
+    else if (!dialogues[id]) issues.push(`이야기가 쓰는 대화 '${id}'가 없습니다. (게임에서 건너뜀)`)
+  }
   return issues
 }

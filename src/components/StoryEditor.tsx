@@ -156,24 +156,35 @@ function clean<T extends Record<string, unknown>>(o: T): T {
 
 // ---------- 이야기 (intro / outro) ----------
 
-const STEP_LABEL: Record<string, string> = { narration: '나레이션', line: '대사', inputNickname: '닉네임 입력' }
+const STEP_LABEL: Record<string, string> = { narration: '나레이션', line: '대사', inputNickname: '닉네임 입력', dialogue: '대화 (선택지)' }
+
+/** 이야기의 대화 단계가 쓰는 대화 ID */
+function storyDialogueIds(story: StoryData): string[] {
+  return [...story.intro, ...story.outro].filter((s) => s.type === 'dialogue').map((s) => s.dialogueId ?? '')
+}
 
 function StepCard({
   step,
   index,
   count,
   characters,
+  dialogueIds,
   onChange,
   onMove,
   onRemove,
+  onCreateDialogue,
+  onOpenDialogue,
 }: {
   step: StoryStep
   index: number
   count: number
   characters: AdminCharacter[]
+  dialogueIds: string[]
   onChange: (s: StoryStep) => void
   onMove: (to: number) => void
   onRemove: () => void
+  onCreateDialogue: () => void
+  onOpenDialogue: (id: string) => void
 }) {
   const type = step.type === 'inputCharacterName' ? 'inputNickname' : step.type
   return (
@@ -192,6 +203,37 @@ function StepCard({
           onChange={(speaker, portrait) => onChange(clean({ ...step, speaker, portrait }))}
         />
       )}
+      {type === 'dialogue' && (
+        <>
+          <div className="row" style={{ alignItems: 'flex-end' }}>
+            <label style={{ minWidth: 220 }}>
+              진행할 대화
+              <select value={step.dialogueId ?? ''} onChange={(e) => onChange(clean({ ...step, dialogueId: e.target.value || undefined }))}>
+                <option value="">(고르세요)</option>
+                {dialogueIds.map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+                {step.dialogueId && !dialogueIds.includes(step.dialogueId) && <option value={step.dialogueId}>없는 대화: {step.dialogueId}</option>}
+              </select>
+            </label>
+            {step.dialogueId && dialogueIds.includes(step.dialogueId) ? (
+              <button type="button" className="secondary small-btn" onClick={() => onOpenDialogue(step.dialogueId!)}>
+                대화 편집 →
+              </button>
+            ) : (
+              <button type="button" className="secondary small-btn" onClick={onCreateDialogue}>
+                새 대화 만들기
+              </button>
+            )}
+          </div>
+          <p className="muted small">
+            대화창에서 이 대화를 선택지까지 진행하고, 대화가 끝나면 다음 단계로 넘어갑니다. 대사·선택지는 ‘인물 대화’ 탭에서 만듭니다. 이야기 속
+            대화에서는 열쇠 주기 효과가 쓰이지 않습니다.
+          </p>
+        </>
+      )}
       {type === 'narration' && (
         <label style={{ maxWidth: 260 }}>
           배경
@@ -201,10 +243,12 @@ function StepCard({
           </select>
         </label>
       )}
-      <label>
-        {type === 'inputNickname' ? '안내 문구 (선택)' : '글'} · <code>{'{nickname}'}</code>은 내 닉네임으로 바뀝니다
-        <textarea rows={type === 'inputNickname' ? 1 : 3} value={step.text ?? ''} onChange={(e) => onChange({ ...step, text: e.target.value })} />
-      </label>
+      {type !== 'dialogue' && (
+        <label>
+          {type === 'inputNickname' ? '안내 문구 (선택)' : '글'} · <code>{'{nickname}'}</code>은 내 닉네임으로 바뀝니다
+          <textarea rows={type === 'inputNickname' ? 1 : 3} value={step.text ?? ''} onChange={(e) => onChange({ ...step, text: e.target.value })} />
+        </label>
+      )}
       {type === 'inputNickname' && <p className="muted small">닉네임이 이미 있는 사람은 이 단계를 건너뜁니다.</p>}
     </div>
   )
@@ -213,11 +257,18 @@ function StepCard({
 function StepList({
   steps,
   characters,
+  dialogueIds,
   onChange,
+  onCreateDialogue,
+  onOpenDialogue,
 }: {
   steps: StoryStep[]
   characters: AdminCharacter[]
+  dialogueIds: string[]
   onChange: (steps: StoryStep[]) => void
+  /** i번 단계에 새 대화를 만들어 연결 */
+  onCreateDialogue: (index: number) => void
+  onOpenDialogue: (id: string) => void
 }) {
   return (
     <div className="obj-fields">
@@ -229,9 +280,12 @@ function StepList({
           index={i}
           count={steps.length}
           characters={characters}
+          dialogueIds={dialogueIds}
           onChange={(next) => onChange(steps.map((x, j) => (j === i ? next : x)))}
           onMove={(to) => onChange(move(steps, i, to))}
           onRemove={() => onChange(steps.filter((_, j) => j !== i))}
+          onCreateDialogue={() => onCreateDialogue(i)}
+          onOpenDialogue={onOpenDialogue}
         />
       ))}
       <div className="row">
@@ -240,6 +294,9 @@ function StepList({
         </button>
         <button type="button" className="secondary small-btn" onClick={() => onChange([...steps, { type: 'line', speaker: NICKNAME, text: '' }])}>
           + 대사
+        </button>
+        <button type="button" className="secondary small-btn" onClick={() => onChange([...steps, { type: 'dialogue' }])}>
+          + 대화 (선택지)
         </button>
         <button
           type="button"
@@ -296,7 +353,8 @@ function NodeCard({
   nodeIds: string[]
   isStart: boolean
   characters: AdminCharacter[]
-  npcName: string
+  /** 화자를 비웠을 때 쓰는 인물 이름. 이야기에서만 쓰는 대화면 없음 (이름표 없음) */
+  npcName?: string
   onChange: (n: DialogueNode) => void
   onRename: (to: string) => string | null
   onRemove: () => void
@@ -451,7 +509,7 @@ function DialogueEditor({
 }: {
   id: string
   dialogue: Dialogue
-  npcName: string
+  npcName?: string
   characters: AdminCharacter[]
   onChange: (d: Dialogue) => void
 }) {
@@ -569,7 +627,22 @@ export default function StoryEditor({
   }
 
   const [addError, setAddError] = useState('')
-  const issues = dialogueIssues(dialogues, npcs.map((n) => n.dialogueId))
+  const storyIds = storyDialogueIds(story)
+  const issues = dialogueIssues(dialogues, npcs.map((n) => n.dialogueId), storyIds)
+
+  /** 이야기의 i번 대화 단계에 새 대화(story1, story2, ...)를 만들어 연결한다. 이야기·대화를 한 번에 바꾼다 */
+  function createStoryDialogue(which: 'intro' | 'outro', index: number) {
+    let n = 1
+    while (dialogues[`story${n}`]) n++
+    const id = `story${n}`
+    const steps = story[which].map((st, j) => (j === index ? { ...st, dialogueId: id } : st))
+    onChange({ ...story, [which]: steps }, { ...dialogues, [id]: { start: 'n1', nodes: { n1: { text: '' } } } })
+  }
+
+  function openDialogue(id: string) {
+    setSelected(id)
+    setPart('dialogues')
+  }
   const missingForNpc = [...new Set(npcs.map((n) => n.dialogueId).filter((id) => id && !dialogues[id]))]
   const usersOf = (id: string) => npcs.filter((n) => n.dialogueId === id)
 
@@ -596,7 +669,14 @@ export default function StoryEditor({
             {part === 'intro' ? '플레이 전에 순서대로 보여 줍니다.' : '클리어한 뒤 결과 화면 전에 보여 줍니다.'} 나레이션은 화면 가운데 띠, 대사는 대화창(이름표·일러스트)에
             나옵니다. 화자 색은 ‘인물’ 메뉴에서 바꿉니다.
           </p>
-          <StepList steps={story[part]} characters={characters} onChange={(steps) => setStory({ ...story, [part]: steps })} />
+          <StepList
+            steps={story[part]}
+            characters={characters}
+            dialogueIds={dialogueIds}
+            onChange={(steps) => setStory({ ...story, [part]: steps })}
+            onCreateDialogue={(i) => createStoryDialogue(part, i)}
+            onOpenDialogue={openDialogue}
+          />
         </>
       )}
 
@@ -624,7 +704,9 @@ export default function StoryEditor({
                   const users = usersOf(id)
                   return (
                     <option key={id} value={id}>
-                      {id} {users.length ? `· ${users.map((u) => u.name).join(', ')}` : '· 쓰는 인물 없음'}
+                      {id} {users.length ? `· ${users.map((u) => u.name).join(', ')}` : ''}
+                      {storyIds.includes(id) ? ' · 이야기' : ''}
+                      {!users.length && !storyIds.includes(id) ? '· 쓰는 곳 없음' : ''}
                     </option>
                   )
                 })}
@@ -656,7 +738,7 @@ export default function StoryEditor({
               key={current}
               id={current}
               dialogue={dialogues[current]}
-              npcName={usersOf(current)[0]?.name ?? '인물'}
+              npcName={usersOf(current)[0]?.name}
               characters={characters}
               onChange={(d) => setDialogues({ ...dialogues, [current]: d })}
             />
