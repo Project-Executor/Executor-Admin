@@ -18,7 +18,8 @@ export default function LoginPage() {
       await login(email.trim(), password)
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.isNetworkError ? '서버에 연결할 수 없습니다. (네트워크·VPN 확인)' : err.message)
+        // 브라우저는 CORS 차단과 연결 실패를 같은 오류로 알려 주므로 둘 다 적는다
+        setError(err.isNetworkError ? '서버에 연결할 수 없습니다. (네트워크, 또는 서버의 CORS 허용 목록 확인)' : err.message)
       } else {
         setError(String(err))
       }
