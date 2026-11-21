@@ -42,6 +42,13 @@ const TERRAIN_TOOLS: { tool: Tool; label: string; symbol: string }[] = [
  * - 벽·바닥: 끌어서 여러 칸. 벽을 칠하면 그 칸의 오브젝트는 지워진다
  * - 오브젝트: 바닥에만, 한 칸에 하나. 놓으면 바로 선택되어 속성을 고칠 수 있다
  */
+/** 게임의 맵 그림 세트 (Executor-Game Resources/Pixel/map/{theme}) */
+const MAP_THEMES = [
+  { value: 'hologram', label: '기본 (메인보드 · 튜토리얼)' },
+  { value: 'helloworld', label: 'Hello World (1챕터)' },
+  { value: 'undercity', label: '언더시티' },
+]
+
 export default function MapEditor({
   map,
   onChange,
@@ -258,6 +265,23 @@ export default function MapEditor({
   return (
     <div className="map-editor">
       <StarPanel map={map} onChange={change} tutorial={tutorial} minRecord={minRecord} />
+
+      <div className="row">
+        <label className="inline small" style={{ gap: 8 }}>
+          맵 그림 세트
+          <select value={String(map.rest.theme ?? 'hologram')} onChange={(e) => change({ ...map, rest: { ...map.rest, theme: e.target.value } })}>
+            {MAP_THEMES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+            {!MAP_THEMES.some((t) => t.value === (map.rest.theme ?? 'hologram')) && (
+              <option value={String(map.rest.theme)}>{String(map.rest.theme)} (게임에 없는 세트 · 기본으로 보임)</option>
+            )}
+          </select>
+        </label>
+        <span className="muted small">게임에서 벽·바닥·오브젝트 그림이 바뀝니다 (map_data.theme). 세트에 없는 오브젝트는 기본 그림을 씁니다.</span>
+      </div>
 
       <div className="editor-bar">
         <div className="row nowrap-row">
