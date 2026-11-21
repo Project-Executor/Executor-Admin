@@ -344,6 +344,14 @@ export interface AdminGuidebook {
   title: string
   image: string | null
   comment: string
+  /** 언어 (예: Java). 없으면 null */
+  language: string | null
+  /** 코드 예시 (여러 줄). 없으면 null */
+  code: string | null
+  /** 대처 방법 한 줄. 없으면 null */
+  remedy: string | null
+  /** 맵에서의 모습 (예: 지나갈 수 없는 칸). 없으면 null */
+  mapNote: string | null
 }
 
 /** POST·PUT /admin/guidebooks (모든 값) */
@@ -356,4 +364,12 @@ export interface AdminGuidebookRequest {
   image: string | null
   /** 1~10000자 */
   comment: string
+  /** 50자 이하, 빈칸이면 null */
+  language: string | null
+  /** 2000자 이하, 여러 줄 */
+  code: string | null
+  /** 255자 이하 */
+  remedy: string | null
+  /** 255자 이하 */
+  mapNote: string | null
 }
