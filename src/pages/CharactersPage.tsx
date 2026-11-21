@@ -3,10 +3,10 @@ import type { FormEvent } from 'react'
 import { createCharacter, deleteCharacter, fetchCharacters, updateCharacter } from '../api/admin'
 import { ApiError } from '../api/client'
 import type { AdminCharacter, AdminCharacterRequest } from '../api/types'
+import NameTag, { COLOR_PATTERN } from '../components/NameTag.tsx'
 
 const NAME_MAX = 50
 const KEY_PATTERN = /^[a-z0-9_-]{1,50}$/
-const COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/
 
 /** 시안 팔레트 (Executor_Export README 색) */
 const PALETTE: { color: string; label: string }[] = [
@@ -20,25 +20,6 @@ const PALETTE: { color: string; label: string }[] = [
   { color: '#FF4D5E', label: '빨강' },
   { color: '#EAF2FF', label: '흰색' },
 ]
-
-/** 대화창 이름표 미리보기 (게임: 바탕 tagColor, 글자·테두리 #0c0a18, 굵게) */
-function NameTag({ name, color }: { name: string; color: string }) {
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        padding: '4px 14px',
-        background: COLOR_PATTERN.test(color) ? color : '#D4D6DE',
-        color: '#0c0a18',
-        border: '2px solid #0c0a18',
-        fontWeight: 700,
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {name || '이름'}
-    </span>
-  )
-}
 
 /** 대화 인물 관리 (/api/admin/characters). 게임 대화창의 이름표 색·일러스트 폴더·주인공 자리 */
 export default function CharactersPage() {

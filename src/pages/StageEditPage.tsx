@@ -7,6 +7,7 @@ import { STAGE_TYPE_LABEL } from '../api/types'
 import type { AdminLayer, AdminOperationTree, AdminStage, AdminStageRequest, StageType } from '../api/types'
 import { formatDateTime } from '../components/datetime'
 import { operationLabel } from '../components/operationLabel'
+import StoryEditor from '../components/StoryEditor.tsx'
 import MapEditor from '../components/MapEditor.tsx'
 import { fromJson, newMap, toJson, validate } from '../components/mapData'
 import type { GridMap } from '../components/mapData'
@@ -50,7 +51,7 @@ export default function StageEditPage() {
   // 맵은 격자(grid)가 기준이고, JSON 탭에서 글로 고친 것은 격자로 돌아올 때 다시 읽는다
   const [grid, setGrid] = useState<GridMap>(() => fromJson(newMap()))
   const [gridKey, setGridKey] = useState(0)
-  const [mapMode, setMapMode] = useState<'grid' | 'json'>('grid')
+  const [mapMode, setMapMode] = useState<'grid' | 'story' | 'json'>('grid')
   const [mapText, setMapText] = useState('')
   const [mapCheck, setMapCheck] = useState('')
 
@@ -77,7 +78,8 @@ export default function StageEditPage() {
     setGridKey((k) => k + 1)
   }
 
-  function switchMode(next: 'grid' | 'json') {
+  /** 격자·이야기 탭은 같은 맵 상태(grid)를 고치고, JSON 탭에서 나올 때만 글을 다시 읽는다 */
+  function switchMode(next: 'grid' | 'story' | 'json') {
     if (next === mapMode) return
     setError('')
     setMapCheck('')
@@ -86,13 +88,15 @@ export default function StageEditPage() {
       setMapMode('json')
       return
     }
-    const r = parseMapData(mapText)
-    if ('error' in r) {
-      setError(`JSON을 고쳐야 격자로 돌아갈 수 있습니다. ${r.error}`)
-      return
+    if (mapMode === 'json') {
+      const r = parseMapData(mapText)
+      if ('error' in r) {
+        setError(`JSON을 고쳐야 다른 탭으로 갈 수 있습니다. ${r.error}`)
+        return
+      }
+      replaceGrid(fromJson(r.value))
     }
-    replaceGrid(fromJson(r.value))
-    setMapMode('grid')
+    setMapMode(next)
   }
 
   /** 지금 편집 중인 맵 데이터 */
@@ -291,6 +295,15 @@ export default function StageEditPage() {
             <button
               type="button"
               role="tab"
+              aria-selected={mapMode === 'story'}
+              className={mapMode === 'story' ? 'tab active' : 'tab'}
+              onClick={() => switchMode('story')}
+            >
+              이야기·대화
+            </button>
+            <button
+              type="button"
+              role="tab"
               aria-selected={mapMode === 'json'}
               className={mapMode === 'json' ? 'tab active' : 'tab'}
               onClick={() => switchMode('json')}
@@ -309,10 +322,19 @@ export default function StageEditPage() {
                 tutorial={stageType === 'TUTORIAL'}
               />
               <p className="muted small">
-                지형·시작 위치·오브젝트는 여기서 고칩니다. 대화(dialogues)·안내(guides)·나레이션(story)는 ‘JSON 직접 편집’에서 고치고,
-                격자에서 고쳐도 그대로 유지됩니다.
+                지형·시작 위치·오브젝트는 여기서 고칩니다. 나레이션·대사(story)와 인물 대화(dialogues)는 ‘이야기·대화’, 안내(guides)는 ‘JSON 직접
+                편집’에서 고치고, 격자에서 고쳐도 그대로 유지됩니다.
               </p>
             </>
+          ) : mapMode === 'story' ? (
+            <StoryEditor
+              story={grid.rest.story}
+              dialogues={grid.rest.dialogues}
+              npcs={grid.objects
+                .filter((o) => o.type === 'npc')
+                .map((o) => ({ id: o.id, name: String(o.name ?? '인물'), dialogueId: String(o.dialogueId ?? '') }))}
+              onChange={(story, dialogues) => setGrid((g) => ({ ...g, rest: { ...g.rest, story, dialogues } }))}
+            />
           ) : (
             <>
               <p className="muted small">
