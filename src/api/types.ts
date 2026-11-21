@@ -35,7 +35,8 @@ export interface MyProfile {
 }
 
 // ---------- 아이템 (GET /admin/items) ----------
-export type ItemType = 'SKIN' | 'THEME'
+/** SKIN 캐릭터 스킨, THEME 화면 테마, CURSOR 메인 터미널 커서, DELTA 델타 꾸미기 */
+export type ItemType = 'SKIN' | 'THEME' | 'CURSOR' | 'DELTA'
 
 export interface AdminItem {
   itemId: number
@@ -194,6 +195,8 @@ export interface ReportStatusResponse {
 export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   SKIN: '스킨',
   THEME: '테마',
+  CURSOR: '커서',
+  DELTA: '델타 꾸미기',
 }
 
 /** POST·PUT /admin/items. PUT은 모든 값을 보낸다 */

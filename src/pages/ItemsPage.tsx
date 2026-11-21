@@ -204,6 +204,8 @@ function ItemForm({
     const p = Number(price)
     if (n.length < 1 || n.length > NAME_MAX) return setError(`이름은 1~${NAME_MAX}자여야 합니다.`)
     if (!Number.isInteger(p) || p < 0) return setError('가격은 0 이상 정수여야 합니다.')
+    if ((itemType === 'CURSOR' || itemType === 'DELTA') && !image.trim())
+      return setError(itemType === 'CURSOR' ? '커서 모양 키를 입력해 주세요. (예: underline-slow)' : '꾸미기 키를 입력해 주세요. (예: antenna)')
     if (item && item.itemType !== itemType && !window.confirm('종류를 바꿀까요? 이미 가진 사람이 있으면 바꿀 수 없습니다.')) return
 
     const req: AdminItemRequest = {
@@ -255,9 +257,26 @@ function ItemForm({
         </label>
       </div>
       <label>
-        이미지 (경로나 키, {TEXT_MAX}자 이하, 선택)
-        <input value={image} maxLength={TEXT_MAX} onChange={(e) => setImage(e.target.value)} />
+        {itemType === 'CURSOR' ? '커서 모양 키' : itemType === 'DELTA' ? '꾸미기 키' : '이미지'} (경로나 키, {TEXT_MAX}자 이하
+        {itemType === 'CURSOR' || itemType === 'DELTA' ? ', 필수' : ', 선택'})
+        <input
+          value={image}
+          maxLength={TEXT_MAX}
+          placeholder={itemType === 'CURSOR' ? 'underline-slow:#ff4fa3' : itemType === 'DELTA' ? 'antenna' : ''}
+          onChange={(e) => setImage(e.target.value)}
+        />
       </label>
+      {itemType === 'CURSOR' && (
+        <p className="muted small">
+          메인 화면 터미널 커서. 모양 <code>block</code> · <code>underline</code> · <code>bar</code>, 뒤에 <code>-slow</code>/
+          <code>-fast</code>(깜박임)와 <code>:#rrggbb</code>(색)를 붙일 수 있습니다. 예: <code>bar-fast:#5cf08a</code>
+        </p>
+      )}
+      {itemType === 'DELTA' && (
+        <p className="muted small">
+          메인 화면 델타 얼굴 위에 겹치는 장식. 지금 게임에 있는 키: <code>antenna</code>(안테나), <code>sunglasses</code>(선글라스)
+        </p>
+      )}
       <label>
         설명 ({description.trim().length}/{TEXT_MAX}, 선택)
         <input value={description} maxLength={TEXT_MAX} onChange={(e) => setDescription(e.target.value)} />
