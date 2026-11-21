@@ -1,6 +1,8 @@
 // 관리자 화면에서 쓰는 API. 기능을 추가할 때 여기에 함수를 더한다.
 import { api, get, patch, post, put } from './client'
 import type {
+  AdminCharacter,
+  AdminCharacterRequest,
   AdminWordList,
   AdminWordListRequest,
   AdminLayer,
@@ -121,6 +123,18 @@ export const updateWordList = (wordListId: number, request: AdminWordListRequest
 
 /** 맵이 쓰고 있어도 지운다 (게임은 기본 단어를 쓴다) */
 export const deleteWordList = (wordListId: number) => api<void>('DELETE', `/admin/word-lists/${wordListId}`)
+
+// ---------- 인물 (대화창 이름표 색) ----------
+
+export const fetchCharacters = () => get<AdminCharacter[]>('/admin/characters')
+
+export const createCharacter = (request: AdminCharacterRequest) => post<AdminCharacter>('/admin/characters', request)
+
+export const updateCharacter = (characterId: number, request: AdminCharacterRequest) =>
+  put<AdminCharacter>(`/admin/characters/${characterId}`, request)
+
+/** 맵이 쓰고 있어도 지운다 (그 대사는 기본 이름표 색) */
+export const deleteCharacter = (characterId: number) => api<void>('DELETE', `/admin/characters/${characterId}`)
 
 // ---------- 작전·스테이지 ----------
 

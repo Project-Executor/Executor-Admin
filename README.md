@@ -65,8 +65,13 @@ npm run build      # dist/ 에 정적 파일 생성
 npm run lint
 ```
 
-- 배포 빌드의 API 주소는 `VITE_API_BASE` (예: `https://executor-server-production-032d.up.railway.app/api`)
-- Railway에 배포 예정. 배포 주소를 서버의 CORS 허용 목록에 넣어야 한다.
+- 배포 주소: https://executor-admin-production.up.railway.app (Railway). 새로고침해도 index.html이 와서 `/users` 같은 주소가 그대로 열린다.
+- **API 주소 `VITE_API_BASE`는 빌드할 때 코드에 들어간다** (예: `https://executor-server-production-032d.up.railway.app/api`).
+  Railway Variables에서 바꾸면 **다시 배포(빌드)해야** 반영된다. 비워 두고 빌드하면 자기 주소의 `/api`를 불러 404가 난다.
+- **서버 CORS 허용 목록**: 관리자 웹은 서버와 주소가 달라서, 서버가 이 주소를 허용해야 브라우저가 응답을 읽는다.
+  서버의 `cors.allowed-origins`(Railway Variables `CORS_ALLOWED_ORIGINS`, 쉼표로 여러 개)에 관리자 주소가 있어야 한다.
+  기본값에 배포 주소와 `http://localhost:5173`이 들어 있다. 관리자 주소가 바뀌면 서버 Variables도 바꾼다.
+- 로그인에서 "서버에 연결할 수 없습니다"가 뜨면 F12 → Console에 `blocked by CORS policy`가 있는지 본다 (있으면 CORS 허용 목록 문제).
 
 ## 메뉴
 

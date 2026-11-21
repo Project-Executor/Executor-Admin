@@ -10,6 +10,9 @@ import type { AdminGuidebook, AdminLayer, AdminGuidebookRequest, AdminOperationT
 const TITLE_MAX = 255
 const IMAGE_MAX = 255
 const COMMENT_MAX = 10000
+const LANGUAGE_MAX = 50
+const CODE_MAX = 2000
+const LINE_MAX = 255
 const CATEGORIES = Object.keys(GUIDEBOOK_CATEGORY_LABEL) as GuidebookCategory[]
 
 /** 도감 관리: 목록, 등록, 수정, 삭제 (/api/admin/guidebooks) */
@@ -185,6 +188,10 @@ function GuidebookForm({
   const [stageId, setStageId] = useState(item?.stageId == null ? '' : String(item.stageId))
   const [image, setImage] = useState(item?.image ?? '')
   const [comment, setComment] = useState(item?.comment ?? '')
+  const [language, setLanguage] = useState(item?.language ?? '')
+  const [code, setCode] = useState(item?.code ?? '')
+  const [remedy, setRemedy] = useState(item?.remedy ?? '')
+  const [mapNote, setMapNote] = useState(item?.mapNote ?? '')
   const [error, setError] = useState('')
   const [saved, setSaved] = useState('')
   const [busy, setBusy] = useState(false)
@@ -203,6 +210,11 @@ function GuidebookForm({
       title: t,
       image: image.trim() || null,
       comment: c,
+      language: language.trim() || null,
+      // 코드는 줄 앞 들여쓰기를 지킨다 (끝 공백만 서버가 지운다)
+      code: code.trim() ? code : null,
+      remedy: remedy.trim() || null,
+      mapNote: mapNote.trim() || null,
     }
     setBusy(true)
     try {
@@ -288,6 +300,33 @@ function GuidebookForm({
       <label>
         내용 ({comment.trim().length.toLocaleString()}/{COMMENT_MAX.toLocaleString()})
         <textarea rows={8} value={comment} maxLength={COMMENT_MAX} onChange={(e) => setComment(e.target.value)} required />
+      </label>
+      <p className="muted small">아래 항목은 모두 선택입니다. 비워 두면 게임 도감 상세에서 그 줄이 보이지 않습니다.</p>
+      <div className="grid3">
+        <label>
+          언어 (예: Java)
+          <input value={language} maxLength={LANGUAGE_MAX} onChange={(e) => setLanguage(e.target.value)} />
+        </label>
+        <label className="span2">
+          맵에서 (예: 지나갈 수 없는 칸)
+          <input value={mapNote} maxLength={LINE_MAX} onChange={(e) => setMapNote(e.target.value)} />
+        </label>
+      </div>
+      <label>
+        코드 예시 ({code.length.toLocaleString()}/{CODE_MAX.toLocaleString()}, 여러 줄)
+        <textarea
+          rows={4}
+          className="code"
+          value={code}
+          maxLength={CODE_MAX}
+          spellCheck={false}
+          placeholder={'String s = null;\ns.length(); // 여기서 예외'}
+          onChange={(e) => setCode(e.target.value)}
+        />
+      </label>
+      <label>
+        대처 (예: 쓰기 전에 s != null 인지 확인하기)
+        <input value={remedy} maxLength={LINE_MAX} onChange={(e) => setRemedy(e.target.value)} />
       </label>
       {error && <p className="error">{error}</p>}
       {saved && <p className="success">{saved}</p>}

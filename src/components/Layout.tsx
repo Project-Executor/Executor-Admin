@@ -12,6 +12,7 @@ const MENU: { label: string; path?: string }[] = [
   { label: '아이템', path: '/items' },
   { label: '도감', path: '/guidebooks' },
   { label: '단어 목록', path: '/word-lists' },
+  { label: '인물', path: '/characters' },
 ]
 
 export default function Layout() {

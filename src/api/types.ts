@@ -35,7 +35,8 @@ export interface MyProfile {
 }
 
 // ---------- 아이템 (GET /admin/items) ----------
-export type ItemType = 'SKIN' | 'THEME'
+/** SKIN 캐릭터 스킨, THEME 화면 테마, CURSOR 메인 터미널 커서, DELTA 델타 꾸미기 */
+export type ItemType = 'SKIN' | 'THEME' | 'CURSOR' | 'DELTA'
 
 export interface AdminItem {
   itemId: number
@@ -194,6 +195,8 @@ export interface ReportStatusResponse {
 export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   SKIN: '스킨',
   THEME: '테마',
+  CURSOR: '커서',
+  DELTA: '델타 꾸미기',
 }
 
 /** POST·PUT /admin/items. PUT은 모든 값을 보낸다 */
@@ -245,6 +248,28 @@ export interface AdminWordListRequest {
   description: string | null
   /** 앞뒤 공백 제거, 빈 줄·중복 제외 후 1개 이상, 하나는 50자 이하 */
   words: string[]
+}
+
+/** GET /admin/characters 항목. 대사의 speaker = name, portrait의 인물 ID = characterKey */
+export interface AdminCharacter {
+  characterId: number
+  /** 일러스트 폴더 ID (Resources/Portraits/{characterKey}) */
+  characterKey: string
+  name: string
+  /** 이름표 바탕색 #RRGGBB */
+  tagColor: string
+  /** 대화창 왼쪽(주인공 자리) */
+  protagonist: boolean
+}
+
+export interface AdminCharacterRequest {
+  /** 영문 소문자·숫자·-·_ 1~50자, 겹치면 409 */
+  characterKey: string
+  /** 1~50자, 겹치면 409 */
+  name: string
+  /** #RRGGBB */
+  tagColor: string
+  protagonist: boolean
 }
 
 /** GET /admin/layers 항목. 레이어(대주제) 안에 작전(소주제)이 들어간다 */
@@ -344,6 +369,14 @@ export interface AdminGuidebook {
   title: string
   image: string | null
   comment: string
+  /** 언어 (예: Java). 없으면 null */
+  language: string | null
+  /** 코드 예시 (여러 줄). 없으면 null */
+  code: string | null
+  /** 대처 방법 한 줄. 없으면 null */
+  remedy: string | null
+  /** 맵에서의 모습 (예: 지나갈 수 없는 칸). 없으면 null */
+  mapNote: string | null
 }
 
 /** POST·PUT /admin/guidebooks (모든 값) */
@@ -356,4 +389,12 @@ export interface AdminGuidebookRequest {
   image: string | null
   /** 1~10000자 */
   comment: string
+  /** 50자 이하, 빈칸이면 null */
+  language: string | null
+  /** 2000자 이하, 여러 줄 */
+  code: string | null
+  /** 255자 이하 */
+  remedy: string | null
+  /** 255자 이하 */
+  mapNote: string | null
 }
