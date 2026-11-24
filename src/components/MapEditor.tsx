@@ -44,9 +44,10 @@ const TERRAIN_TOOLS: { tool: Tool; label: string; symbol: string }[] = [
  */
 /** 게임의 맵 그림 세트 (Executor-Game Resources/Pixel/map/{theme}) */
 const MAP_THEMES = [
-  { value: 'hologram', label: '기본 (메인보드 · 튜토리얼)' },
+  { value: 'hologram', label: '튜토리얼 (기본)' },
   { value: 'helloworld', label: 'Hello World (1챕터)' },
   { value: 'undercity', label: '언더시티' },
+  { value: 'corporation', label: '코퍼레이션 (3챕터)' },
 ]
 
 export default function MapEditor({
