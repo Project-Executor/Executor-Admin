@@ -4,6 +4,7 @@ import type {
   AdminCharacter,
   AdminCharacterRequest,
   AdminWordList,
+  EventRanking,
   AdminWordListRequest,
   AdminLayer,
   AdminLayerRequest,
@@ -116,6 +117,16 @@ export const changeReportStatus = (reportId: number, status: ReportStatus) =>
 // ---------- 단어 목록 (타자 해킹) ----------
 
 export const fetchWordLists = () => get<AdminWordList[]>('/admin/word-lists')
+
+/** 이벤트 순위 (공개 API, 위에서부터 size개) */
+export const fetchEventRanking = (stageId: number, size = 100) => get<EventRanking>(`/events/${stageId}/records?size=${size}`)
+
+/** 이벤트 기록 하나 삭제 (부적절한 이름 등) */
+export const deleteEventRecord = (stageId: number, recordId: number) =>
+  api<void>('DELETE', `/admin/events/${stageId}/records/${recordId}`)
+
+/** 이벤트 기록 전부 삭제 (전시 시작 전 초기화) */
+export const deleteAllEventRecords = (stageId: number) => api<{ deleted: number }>('DELETE', `/admin/events/${stageId}/records`)
 
 export const createWordList = (request: AdminWordListRequest) => post<AdminWordList>('/admin/word-lists', request)
 
