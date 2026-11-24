@@ -2,6 +2,8 @@
 // 격자 편집기는 width·height·tiles·player·objects만 다루고, 나머지 필드(dialogues, guides, story 등)는 그대로 둔다.
 
 import { starIssues } from './stars.ts'
+import { cleanTileArt } from './tileArt'
+
 export type Tile = '#' | '.'
 
 export type MapObjectType = 'exit' | 'crate' | 'breakable' | 'key' | 'door' | 'npc' | 'checkpoint' | 'hidden' | 'anomaly' | 'fakeWall' | 'computer'
@@ -101,7 +103,8 @@ export function fromJson(data: Record<string, unknown>): GridMap {
 
 /** 격자를 JSON 객체로. 필드 순서는 문서 예시를 따른다 */
 export function toJson(map: GridMap): Record<string, unknown> {
-  const { version, theme, ...others } = map.rest
+  // 칸별 그림은 맵 밖 좌표와 칸 종류에 맞지 않는 값을 빼고 저장한다
+  const { version, theme, ...others } = cleanTileArt(map).rest
   return {
     version: version ?? 1,
     theme: theme ?? 'hologram',
