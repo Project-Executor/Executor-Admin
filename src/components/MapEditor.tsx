@@ -47,6 +47,7 @@ const MAP_THEMES = [
   { value: 'hologram', label: '기본 (메인보드 · 튜토리얼)' },
   { value: 'helloworld', label: 'Hello World (1챕터)' },
   { value: 'undercity', label: '언더시티' },
+  { value: 'corporation', label: '코퍼레이션 (3챕터)' },
 ]
 
 export default function MapEditor({
