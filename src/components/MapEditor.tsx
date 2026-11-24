@@ -25,9 +25,10 @@ import { fetchWordLists } from '../api/admin'
 import { ApiError } from '../api/client'
 import type { AdminWordList } from '../api/types'
 import type { SegmentResult } from './mapSolver'
+import { artUrl, autoArt, FLOOR_ART, fitsTile, readTileArt, setTileArt, tileArtAt, WALL_ART } from './tileArt'
 
 /** 팔레트 도구 */
-type Tool = 'wall' | 'floor' | 'player' | 'erase' | 'select' | MapObjectType
+type Tool = 'wall' | 'floor' | 'player' | 'erase' | 'select' | 'art' | MapObjectType
 
 const TERRAIN_TOOLS: { tool: Tool; label: string; symbol: string }[] = [
   { tool: 'select', label: '선택', symbol: '↖' },
@@ -35,6 +36,7 @@ const TERRAIN_TOOLS: { tool: Tool; label: string; symbol: string }[] = [
   { tool: 'floor', label: '바닥', symbol: '·' },
   { tool: 'player', label: '시작 위치', symbol: 'P' },
   { tool: 'erase', label: '오브젝트 지우기', symbol: '⌫' },
+  { tool: 'art', label: '그림 (칸 무늬)', symbol: '▦' },
 ]
 
 /**
@@ -74,6 +76,12 @@ export default function MapEditor({
   // 칸 크기 (확대·축소). 처음에는 맵 크기에 맞춘다
   const [cell, setCell] = useState(map.width > 24 || map.height > 18 ? 22 : 30)
   const [showFrames, setShowFrames] = useState(false)
+  // '그림' 도구로 칠할 무늬 (auto = 자동으로 되돌리기)와 그림 미리 보기
+  const [artName, setArtName] = useState<string>('floor_vias')
+  const [showArt, setShowArt] = useState(false)
+  const theme = String(map.rest.theme ?? 'hologram')
+  const tileArt = readTileArt(map)
+  const chosenCount = Object.keys(tileArt).length
 
   // ---------- 되돌리기·다시 하기 ----------
   // 칠하기 한 번(누르고 끌다 뗄 때까지)은 한 단계, 속성 입력은 0.6초 안에 이어 친 것을 한 단계로 묶는다
@@ -195,6 +203,12 @@ export default function MapEditor({
       case 'erase':
         if (at) change({ ...map, objects: map.objects.filter((o) => o !== at) })
         return
+      case 'art': {
+        // 바닥 무늬는 바닥 칸에만, 벽 무늬는 벽 칸에만 칠한다
+        if (artName !== 'auto' && !fitsTile(map.tiles[y][x], artName)) return
+        change(setTileArt(map, x, y, artName === 'auto' ? null : artName))
+        return
+      }
       default: {
         if (dragging && at?.type === tool) return
         if (x === map.player.x && y === map.player.y) return
@@ -308,6 +322,9 @@ export default function MapEditor({
           <label className="inline-check small">
             <input type="checkbox" checked={showFrames} onChange={(e) => setShowFrames(e.target.checked)} /> 화면 범위 보기 ({view.width} × {view.height})
           </label>
+          <label className="inline-check small">
+            <input type="checkbox" checked={showArt} onChange={(e) => setShowArt(e.target.checked)} /> 그림 미리 보기
+          </label>
         </div>
       </div>
 
@@ -325,6 +342,46 @@ export default function MapEditor({
         ))}
       </div>
 
+      {tool === 'art' && (
+        <div className="art-palette">
+          <div className="row nowrap-row">
+            <b className="small">바닥</b>
+            {FLOOR_ART.map((a) => (
+              <ArtButton key={a.name} theme={theme} name={a.name} label={a.label} active={artName === a.name} onPick={setArtName} />
+            ))}
+            <span className="palette-sep" />
+            <b className="small">벽</b>
+            {WALL_ART.map((a) => (
+              <ArtButton key={a.name} theme={theme} name={a.name} label={a.label} active={artName === a.name} onPick={setArtName} />
+            ))}
+            <span className="palette-sep" />
+            <button type="button" className={artName === 'auto' ? 'tool active' : 'tool'} onClick={() => setArtName('auto')}>
+              ⟲ 자동으로
+            </button>
+            {chosenCount > 0 && (
+              <button
+                type="button"
+                className="secondary small-btn"
+                onClick={() => {
+                  if (window.confirm(`직접 고른 칸 ${chosenCount}개를 모두 자동으로 되돌릴까요?`)) {
+                    const rest = { ...map.rest }
+                    delete rest.tileArt
+                    change({ ...map, rest })
+                  }
+                }}
+              >
+                전부 자동으로 ({chosenCount})
+              </button>
+            )}
+          </div>
+          <p className="muted small">
+            칸을 누르거나 끌어서 칠합니다. 바닥 무늬는 바닥 칸에만, 벽 무늬는 벽 칸에만 칠해집니다. 칠하지 않은 칸은 게임이 자동으로
+            고릅니다(‘그림 미리 보기’로 확인). 직접 고른 칸은 노란 테두리로 표시됩니다. 벽 무늬는 맵 가장자리의 옆·아래 테두리처럼 게임이
+            그리지 않는 벽에서는 보이지 않습니다.
+          </p>
+        </div>
+      )}
+
       <div className="map-work">
         <div className="map-grid-wrap">
           <div
@@ -340,12 +397,17 @@ export default function MapEditor({
                 if (o) cls.push(`obj-${o.type}`)
                 if (isPlayer) cls.push('player')
                 if (o && o.id === selectedId) cls.push('selected')
+                const chosen = tileArtAt(tileArt, map, x, y)
+                const shown = chosen ?? (showArt || tool === 'art' ? autoArt(map, x, y) : null)
+                if (shown) cls.push('has-art')
+                if (chosen) cls.push('art-chosen')
                 return (
                   <button
                     key={`${x},${y}`}
                     type="button"
                     className={cls.join(' ')}
-                    title={`(${x}, ${y})${o ? ` ${o.id}` : ''}${isPlayer ? ' 시작 위치' : ''}`}
+                    style={shown ? { backgroundImage: `url(${artUrl(theme, shown)})` } : undefined}
+                    title={`(${x}, ${y})${o ? ` ${o.id}` : ''}${isPlayer ? ' 시작 위치' : ''}${chosen ? ` · 그림 ${chosen}` : shown ? ` · 자동 ${shown}` : ''}`}
                     onMouseDown={(e) => {
                       e.preventDefault()
                       stroke.current = 'new' // 이번 칠하기 전체를 되돌리기 한 단계로
@@ -478,6 +540,16 @@ function floorAt(map: GridMap, x: number, y: number) {
 }
 
 /** 오브젝트 종류별 속성 입력 (docs/map-data.md 2장) */
+/** '그림' 도구의 무늬 버튼 (지금 세트의 실제 그림) */
+function ArtButton({ theme, name, label, active, onPick }: { theme: string; name: string; label: string; active: boolean; onPick: (name: string) => void }) {
+  return (
+    <button type="button" className={active ? 'art-btn active' : 'art-btn'} onClick={() => onPick(name)} title={name}>
+      <img src={artUrl(theme, name)} alt="" width={32} height={32} />
+      <span>{label}</span>
+    </button>
+  )
+}
+
 function ObjectFields({
   obj,
   objects,
@@ -728,7 +800,7 @@ function ComputerFields({ obj, objects, onChange }: { obj: MapObject; objects: M
       <button type="button" className="secondary small-btn" onClick={() => setEffects([...effects, { type: 'remove', target: '' }])}>
         + 효과 추가
       </button>
-      <p className="muted small">E로 해킹을 시작할 때마다 1턴을 씁니다. 실패하면 다시 도전할 수 있고, 워프하면 복구 전 상태로 돌아갑니다.</p>
+      <p className="muted small">E로 해킹을 시작할 때마다 1턴을 씁니다. 실패하면 다시 도전할 수 있고, 워프하면 복구 전 상태로 돌아갑니다 (받은 열쇠는 유지되고, 다시 해킹해도 열쇠는 한 번만 줍니다).</p>
     </>
   )
 }

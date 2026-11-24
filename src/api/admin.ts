@@ -19,6 +19,7 @@ import type {
   AdminOperation,
   AdminOperationRequest,
   AdminOperationTree,
+  AdminStageBoardPosition,
   AdminReport,
   AdminStage,
   AdminStageRequest,
@@ -155,6 +156,10 @@ export const createOperation = (request: AdminOperationRequest) => post<AdminOpe
 
 export const updateOperation = (operationId: number, request: AdminOperationRequest) =>
   put<AdminOperation>(`/admin/operations/${operationId}`, request)
+
+/** 스테이지 선택 화면 배치. 목록에 없는 스테이지는 그대로 둔다 */
+export const placeStages = (operationId: number, positions: AdminStageBoardPosition[]) =>
+  put<AdminOperationTree>(`/admin/operations/${operationId}/board`, { positions })
 
 /** 스테이지가 남아 있으면 409 OPERATION_HAS_STAGES */
 export const deleteOperation = (operationId: number) => api<void>('DELETE', `/admin/operations/${operationId}`)
