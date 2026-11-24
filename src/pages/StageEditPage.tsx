@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { createStage, deleteStage, fetchLayers, fetchOperations, fetchStage, updateStage } from '../api/admin'
 import { ApiError } from '../api/client'
-import { STAGE_TYPE_LABEL } from '../api/types'
+import { isEventStage, STAGE_TYPE_LABEL } from '../api/types'
 import type { AdminLayer, AdminOperationTree, AdminStage, AdminStageRequest, StageType } from '../api/types'
 import { formatDateTime } from '../components/datetime'
 import { operationLabel } from '../components/operationLabel'
@@ -11,6 +11,7 @@ import StoryEditor from '../components/StoryEditor.tsx'
 import MapEditor from '../components/MapEditor.tsx'
 import { fromJson, newMap, toJson, validate } from '../components/mapData'
 import { trimStarTexts } from '../components/stars'
+import { EventRecordsPanel, readTypingSettings, TYPING_TIME_MAX, TYPING_TIME_MIN, TypingEventFields } from '../components/EventPanels'
 import type { GridMap } from '../components/mapData'
 
 const TITLE_MAX = 100
@@ -100,10 +101,19 @@ export default function StageEditPage() {
     setMapMode(next)
   }
 
-  /** 지금 편집 중인 맵 데이터 */
+  /** 지금 편집 중인 맵 데이터 (타자 이벤트는 격자 대신 event 설정을 쓰므로 늘 격자 기준) */
   function currentMap(): ReturnType<typeof parseMapData> {
+    if (stageType === 'EVENT_TYPING') return { value: { ...toJson(grid), event: typing } }
     if (mapMode === 'json') return parseMapData(mapText)
     return { value: toJson(grid) }
+  }
+
+  const typing = readTypingSettings(grid.rest.event)
+
+  function changeType(next: StageType) {
+    // 타자 이벤트는 격자 탭만 쓰므로 JSON 탭에서 고친 내용을 먼저 격자로 읽는다
+    if (next === 'EVENT_TYPING' && mapMode !== 'grid') switchMode('grid')
+    setStageType(next)
   }
 
   useEffect(() => {
@@ -159,6 +169,11 @@ export default function StageEditPage() {
     if (t.length < 1 || t.length > TITLE_MAX) return `제목은 1~${TITLE_MAX}자여야 합니다.`
     if (!Number.isInteger(par) || par < 1 || par > 9999) return '기준 턴은 1~9999 사이 정수여야 합니다.'
     if (!Number.isInteger(coin) || coin < 0) return '보상 코인은 0 이상 정수여야 합니다.'
+    if (stageType === 'EVENT_TYPING') {
+      if (typing.wordListId == null) return '타자 이벤트의 단어 목록을 고르세요.'
+      if (!Number.isInteger(typing.timeLimit) || typing.timeLimit < TYPING_TIME_MIN || typing.timeLimit > TYPING_TIME_MAX)
+        return `제한 시간은 ${TYPING_TIME_MIN}~${TYPING_TIME_MAX}초여야 합니다.`
+    }
     const map = currentMap()
     if ('error' in map) return map.error
     return { operationId: op, stageNo: no, stageType, title: t, mapData: trimStarTexts(map.value), parMoves: par, rewardCoin: coin }
@@ -173,7 +188,7 @@ export default function StageEditPage() {
       setError(req)
       return
     }
-    const issues = validate(fromJson(req.mapData))
+    const issues = stageType === 'EVENT_TYPING' ? [] : validate(fromJson(req.mapData)) // 타자 이벤트는 맵을 쓰지 않는다
     if (
       issues.length > 0 &&
       !window.confirm(
@@ -256,7 +271,7 @@ export default function StageEditPage() {
             </label>
             <label>
               종류
-              <select value={stageType} onChange={(e) => setStageType(e.target.value as StageType)}>
+              <select value={stageType} onChange={(e) => changeType(e.target.value as StageType)}>
                 {TYPES.map((t) => (
                   <option key={t} value={t}>
                     {STAGE_TYPE_LABEL[t]} ({t})
@@ -279,8 +294,21 @@ export default function StageEditPage() {
               <input type="number" min={0} step={1} value={rewardCoin} onChange={(e) => setRewardCoin(e.target.value)} />
             </label>
           </div>
+          {isEventStage(stageType) && (
+            <p className="muted small">
+              이벤트 스테이지(전시용): 게임에서 늘 열려 있고 해금 순서에 끼지 않습니다. 일반 기록·별·코인 대신 끝나면 이름을 입력해 아래 ‘이벤트 순위’에
+              올립니다 (로그인 없이도). 보상 코인은 주지 않습니다.
+              {stageType === 'EVENT_TURNS' && ' 턴수 이벤트는 맵을 깨면 기록(턴)이 적을수록 높은 순위입니다.'}
+            </p>
+          )}
         </fieldset>
 
+        {stageType === 'EVENT_TYPING' ? (
+          <fieldset>
+            <legend>타자 이벤트</legend>
+            <TypingEventFields value={typing} onChange={(v) => setGrid((g) => ({ ...g, rest: { ...g.rest, event: v } }))} />
+          </fieldset>
+        ) : (
         <fieldset>
           <legend>맵</legend>
           <div className="tabs" role="tablist">
@@ -361,6 +389,7 @@ export default function StageEditPage() {
             </>
           )}
         </fieldset>
+        )}
 
         {error && <p className="error">{error}</p>}
         {saved && <p className="success">{saved}</p>}
@@ -370,6 +399,7 @@ export default function StageEditPage() {
           </button>
         </div>
       </form>
+      {!isNew && loaded && isEventStage(loaded.stageType) && <EventRecordsPanel stageId={stageId} stageType={loaded.stageType} />}
     </section>
   )
 }

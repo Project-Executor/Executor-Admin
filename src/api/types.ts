@@ -216,12 +216,26 @@ export interface AdminItemRequest {
 }
 
 // ---------- 작전·스테이지 (/admin/operations, /admin/stages) ----------
-export type StageType = 'TUTORIAL' | 'NORMAL' | 'BOSS'
+/** EVENT_*: 전시용 이벤트 스테이지 (늘 열림, 로그인 없이 이름을 적어 이벤트 순위에) */
+export type StageType = 'TUTORIAL' | 'NORMAL' | 'BOSS' | 'EVENT_TURNS' | 'EVENT_TYPING'
 
 export const STAGE_TYPE_LABEL: Record<StageType, string> = {
   TUTORIAL: '튜토리얼',
   NORMAL: '일반',
   BOSS: '보스',
+  EVENT_TURNS: '이벤트 · 턴수',
+  EVENT_TYPING: '이벤트 · 타자',
+}
+
+export const isEventStage = (t: StageType) => t === 'EVENT_TURNS' || t === 'EVENT_TYPING'
+
+/** GET /events/{stageId}/records (공개). score: 턴수 이벤트는 턴(적을수록 위), 타자 이벤트는 친 단어 수(많을수록 위) */
+export interface EventRanking {
+  stageId: number
+  title: string
+  stageType: StageType
+  total: number
+  rankings: { recordId: number; rank: number; name: string; score: number; createdAt: string }[]
 }
 
 export interface AdminStageSummary {
