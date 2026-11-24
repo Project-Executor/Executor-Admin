@@ -28,7 +28,7 @@ export interface GridMap {
 }
 
 export const MIN_SIZE = 3
-export const MAX_SIZE = 40
+export const MAX_SIZE = 60
 
 /** 오브젝트 종류별 표시 정보와 새로 놓을 때의 기본 필드 (docs/map-data.md 0·2장) */
 export const OBJECT_INFO: Record<MapObjectType, { label: string; symbol: string; defaults: Record<string, unknown> }> = {
