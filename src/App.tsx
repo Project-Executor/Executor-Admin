@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './auth/context'
 import Layout from './components/Layout.tsx'
 import GuidebooksPage from './pages/GuidebooksPage.tsx'
+import GuestbookPage from './pages/GuestbookPage.tsx'
 import WordListsPage from './pages/WordListsPage.tsx'
 import CharactersPage from './pages/CharactersPage.tsx'
 import HomePage from './pages/HomePage.tsx'
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="notices/new" element={<NoticeEditPage key="new" />} />
         <Route path="notices/:noticeId" element={<NoticeEditPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="guestbook" element={<GuestbookPage />} />
         <Route path="items" element={<ItemsPage />} />
         <Route path="stages" element={<OperationsPage />} />
         <Route path="stages/new" element={<StageEditPage key="new" />} />

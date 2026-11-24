@@ -6,6 +6,7 @@ const MENU: { label: string; path?: string }[] = [
   { label: '홈', path: '/' },
   { label: '메일 발송', path: '/mails' },
   { label: '공지사항', path: '/notices' },
+  { label: '방명록', path: '/guestbook' },
   { label: '유저 관리', path: '/users' },
   { label: '신고', path: '/reports' },
   { label: '레이어·작전', path: '/stages' },
