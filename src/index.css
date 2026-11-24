@@ -1121,3 +1121,26 @@ button.link-btn:hover {
   white-space: nowrap;
 }
 
+
+/* 스테이지 선택 화면 배치 (작전 화면) */
+.stage-board-wrap {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  max-width: 760px;
+}
+.stage-board {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+  user-select: none;
+}
+.stage-board .stage-node {
+  cursor: grab;
+}
+.stage-board.dragging,
+.stage-board.dragging .stage-node {
+  cursor: grabbing;
+}

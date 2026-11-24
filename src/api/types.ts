@@ -231,7 +231,17 @@ export interface AdminStageSummary {
   title: string
   parMoves: number
   rewardCoin: number
+  /** 게임 스테이지 선택 기판 위 노드 가운데 (0~1, 왼쪽 위 기준). null이면 게임이 자동 배치 */
+  boardX: number | null
+  boardY: number | null
   updatedAt: string
+}
+
+/** PUT /admin/operations/{id}/board 항목. x, y 둘 다 null이면 자동 배치로 되돌린다 */
+export interface AdminStageBoardPosition {
+  stageId: number
+  x: number | null
+  y: number | null
 }
 
 /** GET /admin/word-lists 항목. 감염된 컴퓨터 타자 해킹 단어 */

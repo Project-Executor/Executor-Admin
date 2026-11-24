@@ -16,6 +16,7 @@ import { ApiError } from '../api/client'
 import { STAGE_TYPE_LABEL } from '../api/types'
 import type { AdminLayer, AdminOperationTree, AdminStageSummary } from '../api/types'
 import { formatDateTime } from '../components/datetime'
+import { StageBoardEditor, boardKey } from '../components/StageBoardEditor'
 
 const NAME_MAX = 100
 const DESC_MAX = 255
@@ -215,6 +216,7 @@ export default function OperationsPage() {
                 }}
               />
               <StageList operation={shownOp} onChanged={reload} />
+              <StageBoardEditor key={boardKey(shownOp)} operation={shownOp} onSaved={reload} />
             </>
           ) : (
             ops && <p className="muted">왼쪽에서 레이어나 작전을 고르거나 새로 만드세요.</p>
