@@ -728,7 +728,7 @@ function ComputerFields({ obj, objects, onChange }: { obj: MapObject; objects: M
       <button type="button" className="secondary small-btn" onClick={() => setEffects([...effects, { type: 'remove', target: '' }])}>
         + 효과 추가
       </button>
-      <p className="muted small">E로 해킹을 시작할 때마다 1턴을 씁니다. 실패하면 다시 도전할 수 있고, 워프하면 복구 전 상태로 돌아갑니다.</p>
+      <p className="muted small">E로 해킹을 시작할 때마다 1턴을 씁니다. 실패하면 다시 도전할 수 있고, 워프하면 복구 전 상태로 돌아갑니다 (받은 열쇠는 유지되고, 다시 해킹해도 열쇠는 한 번만 줍니다).</p>
     </>
   )
 }
