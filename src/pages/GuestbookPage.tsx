@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { deleteGuestbookEntry, fetchGuestbook } from '../api/admin'
+import { deleteGuestbookEntry, fetchGuestbook, fetchGuestbookSettings, updateGuestbookSettings } from '../api/admin'
 import { ApiError } from '../api/client'
 import type { GuestbookEntry, PageResponse } from '../api/types'
 import { formatDateTime } from '../components/datetime'
@@ -20,6 +20,29 @@ export default function GuestbookPage() {
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<number | null>(null)
   const [tick, setTick] = useState(0)
+  const [enabled, setEnabled] = useState<boolean | null>(null)
+  const [toggling, setToggling] = useState(false)
+
+  useEffect(() => {
+    fetchGuestbookSettings()
+      .then((s) => setEnabled(s.enabled))
+      .catch((e: unknown) => setError(e instanceof ApiError ? e.message : String(e)))
+  }, [])
+
+  async function toggle() {
+    if (enabled === null) return
+    const next = !enabled
+    if (!window.confirm(next ? '방명록을 켤까요? 게임 메인 화면에 방명록이 보이고 누구나 글을 남길 수 있습니다.'
+      : '방명록을 끌까요? 게임에서 방명록 위젯과 창이 사라지고 글을 남길 수 없습니다. (남긴 글은 지워지지 않습니다)')) return
+    setToggling(true)
+    try {
+      setEnabled((await updateGuestbookSettings(next)).enabled)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err))
+    } finally {
+      setToggling(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -73,6 +96,14 @@ export default function GuestbookPage() {
         게임 메인 화면의 방명록(guestbook.exe)에 남긴 글입니다. 로그인 없이 누구나 남길 수 있고, 욕설·전화번호·이메일은 저장할 때 자동으로 가려집니다.
         부적절한 글은 삭제하세요.
       </p>
+      <div className="row">
+        <strong>게임에 보이기</strong>
+        <span className={enabled ? 'success' : 'muted'}>{enabled === null ? '불러오는 중…' : enabled ? '켜짐 (전시 중)' : '꺼짐'}</span>
+        <button type="button" className={enabled ? 'secondary small-btn' : 'small-btn'} disabled={enabled === null || toggling} onClick={toggle}>
+          {enabled ? '끄기' : '켜기'}
+        </button>
+        <span className="muted small">전시할 때만 켜 두세요. 게임에는 10초 안에 반영됩니다.</span>
+      </div>
       <form className="row" onSubmit={search}>
         <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="이름·내용 검색" />
         <button type="submit" className="secondary">

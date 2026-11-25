@@ -125,6 +125,11 @@ export const fetchGuestbook = (q: string, page = 0, size = 20) =>
 
 export const deleteGuestbookEntry = (id: number) => api<void>('DELETE', `/admin/guestbook/${id}`)
 
+/** 방명록 켜짐 여부. 꺼져 있으면 게임에서 방명록이 보이지 않는다 (전시할 때만 켠다) */
+export const fetchGuestbookSettings = () => get<{ enabled: boolean }>('/admin/guestbook/settings')
+
+export const updateGuestbookSettings = (enabled: boolean) => put<{ enabled: boolean }>('/admin/guestbook/settings', { enabled })
+
 /** 이벤트 순위 (공개 API, 위에서부터 size개) */
 export const fetchEventRanking = (stageId: number, size = 100) => get<EventRanking>(`/events/${stageId}/records?size=${size}`)
 
