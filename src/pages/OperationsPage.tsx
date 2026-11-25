@@ -22,7 +22,8 @@ const NAME_MAX = 100
 const DESC_MAX = 255
 
 /** 레이어 이름 표시: "L0 · Tutorial" */
-const layerLabel = (l: AdminLayer) => `L${l.sortOrder} · ${l.name}`
+/** 순서가 음수인 레이어는 비공개 (게임에 보이지 않는다) */
+const layerLabel = (l: AdminLayer) => `L${l.sortOrder} · ${l.name}${l.sortOrder < 0 ? ' (비공개)' : ''}`
 
 /**
  * 레이어·작전·스테이지. 왼쪽은 레이어(대주제) 아래 작전(소주제)이 들어간 트리, 오른쪽은 고른 것의 정보.
@@ -306,8 +307,8 @@ function LayerForm({
           <input value={name} maxLength={NAME_MAX} onChange={(e) => setName(e.target.value)} required />
         </label>
         <label>
-          순서 (0 = 튜토리얼)
-          <input type="number" min={0} step={1} value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
+          순서 (0 = 튜토리얼, -1 이하 = 비공개)
+          <input type="number" min={-999} step={1} value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
         </label>
       </div>
       <label>

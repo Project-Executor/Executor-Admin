@@ -144,7 +144,7 @@ export function EventRecordsPanel({ stageId, stageType }: { stageId: number; sta
         </div>
       </div>
       <p className="muted small table-msg">
-        {stageType === 'EVENT_TYPING' ? '제한 시간 안에 친 단어가 많을수록' : '기록(턴)이 적을수록'} 위입니다. 같은 점수는 같은 순위이고 먼저 올린 기록이 위에
+        {stageType === 'EVENT_TYPING' ? '제한 시간 안에 친 단어가 많을수록' : '기록(턴)이 적을수록'} 위입니다. 같은 점수는 같은 순위이고 이름순으로
         보입니다. 이름은 이 이벤트 안에서 겹칠 수 없습니다. 위에서 100명까지 보입니다.
       </p>
       {error && <p className="error table-msg">{error}</p>}

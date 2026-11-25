@@ -8,6 +8,14 @@ export interface PageResponse<T> {
   totalPages: number
 }
 
+/** 방명록 글 (GET /admin/guestbook). 이름·내용은 서버가 가린 뒤의 값 */
+export interface GuestbookEntry {
+  id: number
+  name: string
+  message: string
+  createdAt: string
+}
+
 export interface UserSummary {
   userId: number
   /** 가입 후 닉네임을 정하기 전이면 null */
